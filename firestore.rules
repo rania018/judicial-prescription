@@ -1,0 +1,63 @@
+rules_version = "2";
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isClerk() {
+      return isAuthenticated() && getUserRole() == "CLERK";
+    }
+
+    function isProsecutorOrAttorney() {
+      return isAuthenticated() && getUserRole() in ["PROSECUTOR", "ATTORNEY_GENERAL"];
+    }
+
+    function isAttorneyGeneral() {
+      return isAuthenticated() && getUserRole() == "ATTORNEY_GENERAL";
+    }
+
+    function caseNotExpired() {
+      return resource.data.status != "EXPIRED";
+    }
+
+    function statusUnchanged() {
+      return request.resource.data.status == resource.data.status;
+    }
+
+    // إدارة المستخدمين:
+    // - القراءة: مسموحة لكل مستخدم مصادق عليه (لعرض صلاحياته من الواجهة عند الحاجة)
+    // - الكتابة: محصورة بالمستخدمين ذوي الدور ATTORNEY_GENERAL
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAttorneyGeneral();
+    }
+
+    // سجلات الأثر الرقابي (دون بيانات شخصية):
+    // - الإنشاء: مسموح لأي مستخدم مصادق عليه
+    // - القراءة: محصورة بالمستخدمين بدور محام عام
+    match /auditLogs/{logId} {
+      allow create: if isAuthenticated();
+      allow read: if isAttorneyGeneral();
+      allow update, delete: if false;
+    }
+
+    match /cases/{caseId} {
+      allow read: if isAuthenticated();
+      allow create: if isClerk();
+      allow update: if isProsecutorOrAttorney() && caseNotExpired() && statusUnchanged();
+      allow delete: if false;
+
+      match /actions/{actionId} {
+        allow read: if isAuthenticated();
+        allow create: if isProsecutorOrAttorney() && get(/databases/$(database)/documents/cases/$(caseId)).data.status != "EXPIRED";
+        allow update, delete: if false;
+      }
+    }
+  }
+}

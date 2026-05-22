@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+
+# Production builds
+dist/
+build/
+
+# Environment variables
+.env*.local
+.env*.backup
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Files created by npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Coverage directory used by tools like istanbul
+coverage/
+.nyc_output
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Output of `npm pack`
+*.tgz
+
+# dotenv environment variables file
+.env
+
+# Firebase
+.firebase/
+.firebase/hosting.ZGlzdA.cache
+.firebase/hosting.MTAuMTYuMi4yMA.cache
+firebase-debug.log*
+firestore-debug.log*
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
