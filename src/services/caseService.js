@@ -11,12 +11,39 @@ import {
   where,
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
-import { calculatePrescription } from '../utils/prescription'
+import { calculatePrescription, getDaysRemaining } from '../utils/prescription'
 import { addAuditLog } from './auditService'
 
 const CASES_COLLECTION = 'cases'
 
-export async function createCase(baseData, userId) {
+/**
+ * Compute the ACTIVE/WARNING/URGENT/CRITICAL/EXPIRED/NON_PRESCRIPTIBLE status
+ * from a prescription end date.  Extracted to avoid repeating this logic in
+ * every mutation function.
+ *
+ * @param {Date|null} prescriptionEndDate
+ * @returns {string}
+ */
+export function computeCaseStatus(prescriptionEndDate) {
+  if (prescriptionEndDate === null) return 'NON_PRESCRIPTIBLE'
+  const daysRemaining = getDaysRemaining(prescriptionEndDate)
+  if (daysRemaining === null) return 'NON_PRESCRIPTIBLE'
+  if (daysRemaining <= 0) return 'EXPIRED'
+  if (daysRemaining <= 7) return 'CRITICAL'
+  if (daysRemaining <= 15) return 'URGENT'
+  if (daysRemaining <= 90) return 'WARNING'
+  return 'ACTIVE'
+}
+
+/**
+ * Create a new case.
+ *
+ * @param {object} baseData  - form data from نموذج_قضية
+ * @param {string} userId    - UID of the user creating the case (typically a CLERK)
+ * @param {object} [userProfile] - full user profile from AuthContext; used to
+ *   populate courtId / councilId scope fields on the case document.
+ */
+export async function createCase(baseData, userId, userProfile) {
   // Prepare data for calculation
   const { 
     prescriptionStartDate, 
@@ -32,19 +59,7 @@ export async function createCase(baseData, userId) {
     minorBirthDate: baseData.minorBirthDate || null,
   })
 
-  // Determine status based on remaining days
-  let status = 'ACTIVE'
-  if (prescriptionEndDate === null) {
-    status = 'NON_PRESCRIPTIBLE' // Non-expiring case
-  } else {
-    const { getDaysRemaining } = await import('../utils/prescription')
-    const daysRemaining = getDaysRemaining(prescriptionEndDate)
-    
-    if (daysRemaining <= 0) status = 'EXPIRED'
-    else if (daysRemaining <= 7) status = 'CRITICAL'
-    else if (daysRemaining <= 15) status = 'URGENT'
-    else if (daysRemaining <= 90) status = 'WARNING'
-  }
+  const status = computeCaseStatus(prescriptionEndDate)
 
   const payload = {
     caseReference: baseData.caseReference,
@@ -64,6 +79,15 @@ export async function createCase(baseData, userId) {
     createdAt: serverTimestamp(),
     interruptionHistory: [],
     suspensionHistory: [],
+    // Ownership / scope fields (Phase 1 foundation)
+    // assignedTo: the UID of the judicial officer responsible for this case.
+    // Defaults to null; set explicitly when a clerk assigns a case to a judge.
+    assignedTo: baseData.assignedTo ?? null,
+    // courtId / councilId: copied from the creating user's profile so that
+    // supervisory roles (PUBLIC_PROSECUTOR, ATTORNEY_GENERAL) can query cases
+    // within their organisational scope.
+    courtId: userProfile?.courtId ?? null,
+    councilId: userProfile?.councilId ?? null,
   }
 
   const ref = await addDoc(collection(db, CASES_COLLECTION), payload)
@@ -80,7 +104,7 @@ export async function createCase(baseData, userId) {
   return { id: ref.id, ...snapshot.data() }
 }
 
-export async function listCases({ status, caseReference, crimeType }) {
+export async function listCases({ status, caseReference, crimeType, assignedTo } = {}) {
   const colRef = collection(db, CASES_COLLECTION)
   const constraints = []
 
@@ -94,6 +118,11 @@ export async function listCases({ status, caseReference, crimeType }) {
 
   if (crimeType && crimeType !== 'ALL') {
     constraints.push(where('crimeType', '==', crimeType))
+  }
+
+  // Scope to a specific owner when requested (e.g. JUDGE role viewing own cases)
+  if (assignedTo) {
+    constraints.push(where('assignedTo', '==', assignedTo))
   }
 
   const q = constraints.length
@@ -181,18 +210,7 @@ export async function addCaseInterruption(caseId, baseInterruption, userId, case
   })
 
   // Determine new status
-  let newStatus = 'ACTIVE'
-  if (prescriptionEndDate === null) {
-    newStatus = 'NON_PRESCRIPTIBLE'
-  } else {
-    const { getDaysRemaining } = await import('../utils/prescription')
-    const daysRemaining = getDaysRemaining(prescriptionEndDate)
-    
-    if (daysRemaining <= 0) newStatus = 'EXPIRED'
-    else if (daysRemaining <= 7) newStatus = 'CRITICAL'
-    else if (daysRemaining <= 15) newStatus = 'URGENT'
-    else if (daysRemaining <= 90) newStatus = 'WARNING'
-  }
+  const newStatus = computeCaseStatus(prescriptionEndDate)
 
   await updateDoc(doc(db, CASES_COLLECTION, caseId), {
     interruptionHistory: updatedInterruptionHistory,
@@ -257,18 +275,7 @@ export async function addCaseSuspension(caseId, suspensionData, userId, caseData
   })
 
   // Determine new status
-  let newStatus = 'ACTIVE'
-  if (prescriptionEndDate === null) {
-    newStatus = 'NON_PRESCRIPTIBLE'
-  } else {
-    const { getDaysRemaining } = await import('../utils/prescription')
-    const daysRemaining = getDaysRemaining(prescriptionEndDate)
-    
-    if (daysRemaining <= 0) newStatus = 'EXPIRED'
-    else if (daysRemaining <= 7) newStatus = 'CRITICAL'
-    else if (daysRemaining <= 15) newStatus = 'URGENT'
-    else if (daysRemaining <= 90) newStatus = 'WARNING'
-  }
+  const newStatus = computeCaseStatus(prescriptionEndDate)
 
   await updateDoc(doc(db, CASES_COLLECTION, caseId), {
     suspensionHistory: updatedSuspensionHistory,
@@ -325,18 +332,7 @@ export async function resumeCaseFromSuspension(caseId, resumeData, userId, caseD
   })
 
   // Determine new status
-  let newStatus = 'ACTIVE'
-  if (prescriptionEndDate === null) {
-    newStatus = 'NON_PRESCRIPTIBLE'
-  } else {
-    const { getDaysRemaining } = await import('../utils/prescription')
-    const daysRemaining = getDaysRemaining(prescriptionEndDate)
-    
-    if (daysRemaining <= 0) newStatus = 'EXPIRED'
-    else if (daysRemaining <= 7) newStatus = 'CRITICAL'
-    else if (daysRemaining <= 15) newStatus = 'URGENT'
-    else if (daysRemaining <= 90) newStatus = 'WARNING'
-  }
+  const newStatus = computeCaseStatus(prescriptionEndDate)
 
   await updateDoc(doc(db, CASES_COLLECTION, caseId), {
     suspensionHistory: updatedSuspensionHistory,

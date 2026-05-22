@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react'
-import { listUsers, updateUserRoleAndActive } from '../services/userService'
+import { listUsers, updateUserRoleAndActive, updateUserProfile } from '../services/userService'
 // @ts-ignore JSX module implemented in JS
 import { useToast } from '../context/ToastContext.jsx'
 
 const ROLES = [
-  { value: 'CLERK', label: 'كاتب ضبط' },
-  { value: 'PROSECUTOR', label: 'عضو نيابة' },
-  { value: 'ATTORNEY_GENERAL', label: 'محام عام' },
+  { value: 'CLERK', label: 'أمين الضبط' },
+  { value: 'JUDGE', label: 'قاضٍ' },
+  { value: 'PUBLIC_PROSECUTOR', label: 'وكيل الجمهورية' },
+  { value: 'ATTORNEY_GENERAL', label: 'النائب العام' },
+  // Legacy entries so existing records display correctly in the dropdown
+  { value: 'INVESTIGATING_JUDGE', label: 'قاضي التحقيق (قديم)' },
+  { value: 'PROSECUTOR', label: 'النيابة العامة (قديم)' },
 ]
 
 export default function إدارة_المستخدمين() {
@@ -71,6 +75,23 @@ export default function إدارة_المستخدمين() {
     }
   }
 
+  const handleScopeUpdate = async (id, field, value) => {
+    setSavingId(id)
+    setError('')
+    try {
+      await updateUserProfile(id, { [field]: value || null })
+      setUsers((prev) =>
+        prev.map((u) => (u.id === id ? { ...u, [field]: value || null } : u)),
+      )
+      toast.success('تم تحديث نطاق الاختصاص بنجاح.')
+    } catch (e) {
+      setError('تعذر تحديث نطاق الاختصاص. يرجى المحاولة لاحقاً.')
+      toast.error('تعذر تحديث نطاق الاختصاص. يرجى المحاولة لاحقاً.')
+    } finally {
+      setSavingId(null)
+    }
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -82,7 +103,9 @@ export default function إدارة_المستخدمين() {
           <div>
             <div className="card-title">قائمة المستخدمين</div>
             <div className="card-subtitle">
-              إدارة صلاحيات الوصول للنظام وفقاً لدور كل مستخدم.
+              إدارة صلاحيات الوصول للنظام وفقاً لدور كل مستخدم. يمكن تحديد
+              معرّف المحكمة (courtId) لوكلاء الجمهورية ومعرّف المجلس (councilId)
+              للنواب العامين لتفعيل الاطلاع الرقابي.
             </div>
           </div>
           <button
@@ -127,7 +150,10 @@ export default function إدارة_المستخدمين() {
               <thead>
                 <tr>
                   <th>المعرّف (UID)</th>
+                  <th>الاسم</th>
                   <th>الدور</th>
+                  <th>معرّف المحكمة</th>
+                  <th>معرّف المجلس</th>
                   <th>حالة الحساب</th>
                   <th></th>
                 </tr>
@@ -135,7 +161,8 @@ export default function إدارة_المستخدمين() {
               <tbody>
                 {users.map((u) => (
                   <tr key={u.id}>
-                    <td>{u.id}</td>
+                    <td style={{ fontSize: '0.75rem' }}>{u.id}</td>
+                    <td>{u.displayName ?? '—'}</td>
                     <td>
                       <select
                         className="form-select"
@@ -154,6 +181,34 @@ export default function إدارة_المستخدمين() {
                           </option>
                         ))}
                       </select>
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        className="form-input"
+                        style={{ width: '8rem' }}
+                        defaultValue={u.courtId ?? ''}
+                        placeholder="court-01"
+                        onBlur={(e) =>
+                          handleScopeUpdate(u.id, 'courtId', e.target.value.trim())
+                        }
+                        disabled={savingId === u.id}
+                        title="معرّف المحكمة — للاطلاع الرقابي لوكيل الجمهورية"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        className="form-input"
+                        style={{ width: '8rem' }}
+                        defaultValue={u.councilId ?? ''}
+                        placeholder="council-01"
+                        onBlur={(e) =>
+                          handleScopeUpdate(u.id, 'councilId', e.target.value.trim())
+                        }
+                        disabled={savingId === u.id}
+                        title="معرّف المجلس — للاطلاع الرقابي للنائب العام"
+                      />
                     </td>
                     <td>
                       <button
