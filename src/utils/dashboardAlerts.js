@@ -87,7 +87,9 @@ function sortAlerts(cases) {
     const daysA = getDaysRemaining(a.prescriptionEndDate) ?? Number.MAX_SAFE_INTEGER
     const daysB = getDaysRemaining(b.prescriptionEndDate) ?? Number.MAX_SAFE_INTEGER
     if (daysA !== daysB) return daysA - daysB
-    return (a.caseReference || '').localeCompare(b.caseReference || '', 'ar')
+    const referenceA = a.caseReference || ''
+    const referenceB = b.caseReference || ''
+    return referenceA.localeCompare(referenceB, 'ar')
   })
 }
 

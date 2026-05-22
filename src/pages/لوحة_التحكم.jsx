@@ -46,6 +46,13 @@ function getLastUpdatedText(lastUpdated) {
   return `آخر تحديث منذ ${Math.floor(sec / 3600)} ساعة`
 }
 
+function getCaseDateValue(value) {
+  if (!value) return null
+  if (typeof value.toDate === 'function') return value.toDate()
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
 export default function لوحة_التحكم() {
   const { user, role, userProfile } = useAuth()
   const toast = useToast()
@@ -91,6 +98,17 @@ export default function لوحة_التحكم() {
       }, {}),
     [allCases],
   )
+  const nearestPrintableCase = useMemo(() => {
+    const datedCases = allCases
+      .map((caseData) => ({
+        ...caseData,
+        comparableDate: getCaseDateValue(caseData.prescriptionEndDate),
+      }))
+      .filter((caseData) => caseData.comparableDate)
+      .sort((a, b) => a.comparableDate - b.comparableDate)
+
+    return datedCases[0] || allCases[0] || null
+  }, [allCases])
 
   const summaryMetrics = useMemo(
     () => [
@@ -176,18 +194,18 @@ export default function لوحة_التحكم() {
         },
       )
 
-      if (allCases[0]?.id) {
+      if (nearestPrintableCase?.id) {
         actions.push({
           key: 'print',
           label: 'طباعة أقرب ملف',
           variant: 'secondary',
-          onClick: () => navigate(`/القضايا/${allCases[0].id}/طباعة`),
+          onClick: () => navigate(`/القضايا/${nearestPrintableCase.id}/طباعة`),
         })
       }
     }
 
     return actions
-  }, [allCases, counts.CRITICAL, counts.WARNING, navigate, role])
+  }, [counts.CRITICAL, counts.WARNING, navigate, nearestPrintableCase, role])
 
   useEffect(() => {
     if (!loading && !notifiedHighPriority && (counts.CRITICAL || 0) > 0) {
@@ -405,11 +423,11 @@ export default function لوحة_التحكم() {
                   <strong>بحث واستعراض</strong>
                   <span>تصفية القضايا حسب الحالة أو رقم الملف</span>
                 </button>
-                {allCases[0]?.id && (
+                {nearestPrintableCase?.id && (
                   <button
                     type="button"
                     className="dashboard-shortcut"
-                    onClick={() => navigate(`/القضايا/${allCases[0].id}/طباعة`)}
+                    onClick={() => navigate(`/القضايا/${nearestPrintableCase.id}/طباعة`)}
                   >
                     <strong>طباعة ملف قريب الأجل</strong>
                     <span>فتح صفحة الطباعة للملف الأقرب انتهاءً</span>

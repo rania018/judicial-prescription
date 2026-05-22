@@ -88,17 +88,22 @@ const LEGACY_STATUS_ALIASES = {
   URGENT: 'WARNING',
 }
 
-export const STATUS_LABELS = Object.fromEntries(
-  Object.entries(STATUS_META).map(([key, value]) => [key, value.label]),
-)
+export const STATUS_LABELS = {
+  ...Object.fromEntries(Object.entries(STATUS_META).map(([key, value]) => [key, value.label])),
+  URGENT: STATUS_META.WARNING.label,
+}
 
-export const STATUS_BADGE_CLASS = Object.fromEntries(
-  Object.entries(STATUS_META).map(([key, value]) => [key, value.badgeClass]),
-)
+export const STATUS_BADGE_CLASS = {
+  ...Object.fromEntries(
+    Object.entries(STATUS_META).map(([key, value]) => [key, value.badgeClass]),
+  ),
+  URGENT: STATUS_META.WARNING.badgeClass,
+}
 
-export const STATUS_CARD_CLASS = Object.fromEntries(
-  Object.entries(STATUS_META).map(([key, value]) => [key, value.cardClass]),
-)
+export const STATUS_CARD_CLASS = {
+  ...Object.fromEntries(Object.entries(STATUS_META).map(([key, value]) => [key, value.cardClass])),
+  URGENT: STATUS_META.WARNING.cardClass,
+}
 
 export const STATUS_ORDER = [
   'CRITICAL',
@@ -108,10 +113,6 @@ export const STATUS_ORDER = [
   'EXPIRED',
   'NON_PRESCRIPTIBLE',
 ]
-
-STATUS_LABELS.URGENT = STATUS_LABELS.WARNING
-STATUS_BADGE_CLASS.URGENT = STATUS_BADGE_CLASS.WARNING
-STATUS_CARD_CLASS.URGENT = STATUS_CARD_CLASS.WARNING
 
 function toDateValue(value) {
   if (!value) return null
