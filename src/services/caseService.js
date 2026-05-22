@@ -23,6 +23,30 @@ import { addAuditLog } from './auditService'
 
 const CASES_COLLECTION = 'cases'
 
+function isPlainObject(value) {
+  if (!value || typeof value !== 'object') return false
+  const prototype = Object.getPrototypeOf(value)
+  return prototype === Object.prototype || prototype === null
+}
+
+function sanitizeFirestoreData(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => sanitizeFirestoreData(item))
+      .filter((item) => item !== undefined)
+  }
+
+  if (isPlainObject(value)) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, entry]) => entry !== undefined)
+        .map(([key, entry]) => [key, sanitizeFirestoreData(entry)]),
+    )
+  }
+
+  return value
+}
+
 function normalizeCaseRecord(data) {
   if (!data) return data
   return {
@@ -77,7 +101,7 @@ export async function createCase(baseData, userId, userProfile = {}) {
     minorBirthDate: baseData.minorBirthDate || null,
   })
 
-  const payload = {
+  const payload = sanitizeFirestoreData({
     caseReference: (baseData.caseReference || '').trim(),
     trackType: baseData.trackType,
     crimeType: baseData.crimeType,
@@ -99,7 +123,7 @@ export async function createCase(baseData, userId, userProfile = {}) {
     createdAt: serverTimestamp(),
     interruptionHistory: [],
     suspensionHistory: [],
-  }
+  })
 
   const ref = await addDoc(collection(db, CASES_COLLECTION), payload)
   const snapshot = await getDoc(ref)
@@ -281,11 +305,11 @@ export async function addCaseInterruption(
   assertActionDateNotFuture(baseInterruption.actionDate)
 
   const interruptionsRef = collection(db, CASES_COLLECTION, caseId, 'interruptions')
-  const payload = {
+  const payload = sanitizeFirestoreData({
     ...baseInterruption,
     createdBy: userId,
     createdAt: serverTimestamp(),
-  }
+  })
 
   const interruptionRef = await addDoc(interruptionsRef, payload)
   await addAuditLog({
@@ -300,15 +324,16 @@ export async function addCaseInterruption(
     },
   })
 
+  const currentSuspensionHistory = caseData.suspensionHistory || []
   const updatedInterruptionHistory = [
     ...(caseData.interruptionHistory || []),
-    {
+    sanitizeFirestoreData({
       id: interruptionRef.id,
       type: baseInterruption.actionType,
       date: baseInterruption.actionDate,
       performedBy: userId,
       notes: baseInterruption.notes,
-    },
+    }),
   ]
 
   const { prescriptionStartDate, prescriptionEndDate } = calculatePrescription({
@@ -321,15 +346,15 @@ export async function addCaseInterruption(
     isMinor: caseData.isMinor || false,
     minorBirthDate: caseData.minorBirthDate || null,
     interruptionHistory: updatedInterruptionHistory,
-    suspensionHistory: caseData.suspensionHistory,
+    suspensionHistory: currentSuspensionHistory,
   })
 
-  await updateDoc(doc(db, CASES_COLLECTION, caseId), {
+  await updateDoc(doc(db, CASES_COLLECTION, caseId), sanitizeFirestoreData({
     interruptionHistory: updatedInterruptionHistory,
     prescriptionStartDate,
     prescriptionEndDate,
-    status: getCaseStatus(prescriptionEndDate, updatedSuspensionHistory),
-  })
+    status: getCaseStatus(prescriptionEndDate, currentSuspensionHistory),
+  }))
 }
 
 export async function addCaseSuspension(
@@ -360,12 +385,12 @@ export async function addCaseSuspension(
   }
 
   const suspensionsRef = collection(db, CASES_COLLECTION, caseId, 'suspensions')
-  const payload = {
+  const payload = sanitizeFirestoreData({
     ...suspensionData,
     suspensionReason: reason,
     suspendedBy: userId,
     createdAt: serverTimestamp(),
-  }
+  })
 
   const suspensionRef = await addDoc(suspensionsRef, payload)
   await addAuditLog({
@@ -382,13 +407,13 @@ export async function addCaseSuspension(
 
   const updatedSuspensionHistory = [
     ...(caseData.suspensionHistory || []),
-    {
+    sanitizeFirestoreData({
       id: suspensionRef.id,
       startDate: suspensionData.actionDate,
       reason,
       suspendedBy: userId,
       notes: suspensionData.notes,
-    },
+    }),
   ]
 
   const { prescriptionStartDate, prescriptionEndDate } = calculatePrescription({
@@ -404,12 +429,12 @@ export async function addCaseSuspension(
     suspensionHistory: updatedSuspensionHistory,
   })
 
-  await updateDoc(doc(db, CASES_COLLECTION, caseId), {
+  await updateDoc(doc(db, CASES_COLLECTION, caseId), sanitizeFirestoreData({
     suspensionHistory: updatedSuspensionHistory,
     prescriptionStartDate,
     prescriptionEndDate,
     status: getCaseStatus(prescriptionEndDate, updatedSuspensionHistory),
-  })
+  }))
 }
 
 export async function resumeCaseFromSuspension(
@@ -441,10 +466,10 @@ export async function resumeCaseFromSuspension(
   }
 
   const suspensionRef = doc(db, CASES_COLLECTION, caseId, 'suspensions', activeSuspension.id)
-  await updateDoc(suspensionRef, {
+  await updateDoc(suspensionRef, sanitizeFirestoreData({
     endDate: resumeData.actionDate,
     resumedBy: userId,
-  })
+  }))
 
   const updatedSuspensionHistory = [...(caseData.suspensionHistory || [])]
   const idx = updatedSuspensionHistory.findIndex(
@@ -471,12 +496,12 @@ export async function resumeCaseFromSuspension(
     suspensionHistory: updatedSuspensionHistory,
   })
 
-  await updateDoc(doc(db, CASES_COLLECTION, caseId), {
+  await updateDoc(doc(db, CASES_COLLECTION, caseId), sanitizeFirestoreData({
     suspensionHistory: updatedSuspensionHistory,
     prescriptionStartDate,
     prescriptionEndDate,
     status: getCaseStatus(prescriptionEndDate, updatedSuspensionHistory),
-  })
+  }))
 
   await addAuditLog({
     type: 'SUSPENSION_RESUMED',
