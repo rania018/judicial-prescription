@@ -291,7 +291,7 @@ export default function لوحة_التحكم() {
                         <tbody>
                           {expiringSoon.map((c) => (
                             <tr key={c.id}>
-                              <td>{c.caseCode}</td>
+                              <td>{c.caseReference}</td>
                               <td>{formatArabicDate(c.prescriptionEndDate)}</td>
                               <td>
                                 <span
@@ -345,7 +345,7 @@ export default function لوحة_التحكم() {
                         <tbody>
                           {attentionCases.slice(0, 10).map((c) => (
                             <tr key={c.id}>
-                              <td>{c.caseCode}</td>
+                              <td>{c.caseReference}</td>
                               <td>{formatArabicDate(c.prescriptionEndDate)}</td>
                               <td>
                                 <شارة_الحالة status={c.status} />

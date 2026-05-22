@@ -44,7 +44,7 @@ export default function القضايا() {
     try {
       const data = await listCases({
         status: statusFilter,
-        caseCode: caseCodeFilter,
+        caseReference: caseCodeFilter,
         crimeType: crimeTypeFilter,
       })
       setCases(data)
@@ -74,7 +74,7 @@ export default function القضايا() {
       'الحالة',
     ]
     const rows = cases.map((c) => [
-      c.caseCode ?? '',
+      c.caseReference ?? '',
       getCrimeTypeLabel(c.crimeType ?? ''),
       formatArabicDate(c.prescriptionStartDate),
       formatArabicDate(c.lastActionDate),
@@ -221,7 +221,7 @@ export default function القضايا() {
                     style={{ cursor: 'pointer' }}
                     onClick={() => navigate(`/القضايا/${c.id}`)}
                   >
-                    <td>{c.caseCode}</td>
+                    <td>{c.caseReference}</td>
                     <td>{getCrimeTypeLabel(c.crimeType)}</td>
                     <td>{formatArabicDate(c.lastActionDate)}</td>
                     <td>{formatArabicDate(c.prescriptionEndDate)}</td>

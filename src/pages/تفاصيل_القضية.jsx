@@ -9,7 +9,7 @@ import سجل_إجراءات_التقادم from '../components/سجل_إجرا�
 
 export default function تفاصيل_القضية() {
   const { caseId } = useParams();
-  const { user, role } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [caseData, setCaseData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -208,7 +208,7 @@ export default function تفاصيل_القضية() {
       <سجل_إجراءات_التقادم 
         caseId={caseId}
         caseData={caseData}
-        userRole={role}
+        userProfile={profile}
         onAddInterruption={handleAddInterruption}
         onAddSuspension={handleAddSuspension}
         onResumeSuspension={handleResumeSuspension}

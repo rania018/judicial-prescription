@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { getInterruptionTypeLabel } from '../utils/statusHelpers';
 import { formatArabicDate } from '../utils/prescription';
+import { canPerformJudicialAction } from '../utils/rbacHelper';
 import نموذج_إجراء from './نموذج_إجراء';
 
-export default function سجل_إجراءات_التقادم({ caseId, caseData, userRole, onAddInterruption, onAddSuspension, onResumeSuspension }) {
+export default function سجل_إجراءات_التقادم({ caseId, caseData, userProfile, onAddInterruption, onAddSuspension, onResumeSuspension }) {
   const [interruptions, setInterruptions] = useState([]);
   const [suspensions, setSuspensions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +47,9 @@ export default function سجل_إجراءات_التقادم({ caseId, caseData,
     setResumeDate('');
   };
 
+  // Determine whether this user can perform judicial actions on this case
+  const canAct = canPerformJudicialAction(userProfile, caseData)
+
   // Check if there's an active suspension
   const activeSuspension = suspensions.find(s => !s.endDate);
 
@@ -70,7 +74,7 @@ export default function سجل_إجراءات_التقادم({ caseId, caseData,
           <div className="form-actions mb-4">
             {caseData.status !== 'EXPIRED' && caseData.status !== 'NON_PRESCRIPTIBLE' && (
               <>
-                {userRole === 'PROSECUTOR' && (
+                {canAct && (
                   <button
                     type="button"
                     className="btn btn-primary mr-2"
@@ -80,7 +84,7 @@ export default function سجل_إجراءات_التقادم({ caseId, caseData,
                   </button>
                 )}
                 
-                {(userRole === 'PROSECUTOR' || userRole === 'ATTORNEY_GENERAL') && (
+                {canAct && (
                   <button
                     type="button"
                     className="btn btn-secondary mr-2"
@@ -91,7 +95,7 @@ export default function سجل_إجراءات_التقادم({ caseId, caseData,
                   </button>
                 )}
                 
-                {activeSuspension && (userRole === 'PROSECUTOR' || userRole === 'ATTORNEY_GENERAL') && (
+                {activeSuspension && canAct && (
                   <button
                     type="button"
                     className="btn btn-success"

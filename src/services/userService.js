@@ -32,10 +32,31 @@ export async function updateUserRoleAndActive(id, { role, active }) {
   await updateDoc(ref, payload)
 }
 
-// Export available roles for use in UI
+/**
+ * Update extended user profile fields including organisational scope metadata.
+ * Only provided (non-undefined) fields are written.
+ *
+ * @param {string} id - Firestore user document ID (= Firebase Auth UID)
+ * @param {{ role?: string, active?: boolean, displayName?: string, courtId?: string|null, councilId?: string|null }} fields
+ */
+export async function updateUserProfile(id, { role, active, displayName, courtId, councilId } = {}) {
+  const ref = doc(db, USERS_COLLECTION, id)
+  const payload = {}
+  if (role !== undefined) payload.role = role
+  if (typeof active === 'boolean') payload.active = active
+  if (displayName !== undefined) payload.displayName = displayName
+  if (courtId !== undefined) payload.courtId = courtId
+  if (councilId !== undefined) payload.councilId = councilId
+  await updateDoc(ref, payload)
+}
+
+// Canonical role list for use in UI dropdowns
 export const AVAILABLE_ROLES = [
   { value: 'CLERK', label: 'أمين الضبط' },
-  { value: 'INVESTIGATING_JUDGE', label: 'قاضي التحقيق' },
-  { value: 'PROSECUTOR', label: 'النيابة العامة' },
-  { value: 'ATTORNEY_GENERAL', label: 'المحامي العام' },
+  { value: 'JUDGE', label: 'قاضٍ' },
+  { value: 'PUBLIC_PROSECUTOR', label: 'وكيل الجمهورية' },
+  { value: 'ATTORNEY_GENERAL', label: 'النائب العام' },
+  // Legacy values kept for backward compatibility with existing user documents
+  { value: 'INVESTIGATING_JUDGE', label: 'قاضي التحقيق (قديم)' },
+  { value: 'PROSECUTOR', label: 'النيابة العامة (قديم)' },
 ]

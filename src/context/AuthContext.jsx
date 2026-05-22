@@ -12,6 +12,16 @@ const AuthContext = createContext(null)
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [role, setRole] = useState(null)
+  /**
+   * Full user profile loaded from Firestore.
+   * Shape: { uid, role, displayName, courtId, councilId, active }
+   *
+   * courtId  – organisational scope for PUBLIC_PROSECUTOR (وكيل الجمهورية)
+   * councilId – organisational scope for ATTORNEY_GENERAL (النائب العام)
+   *
+   * These fields drive the ownership-aware permission helpers in rbacHelper.js.
+   */
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -19,6 +29,7 @@ export function AuthProvider({ children }) {
       if (!firebaseUser) {
         setUser(null)
         setRole(null)
+        setProfile(null)
         setLoading(false)
         return
       }
@@ -28,13 +39,24 @@ export function AuthProvider({ children }) {
         const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid))
         if (userDoc.exists()) {
           const data = userDoc.data()
-          setRole(data.role ?? null)
+          const userRole = data.role ?? null
+          setRole(userRole)
+          setProfile({
+            uid: firebaseUser.uid,
+            role: userRole,
+            displayName: data.displayName ?? firebaseUser.displayName ?? null,
+            courtId: data.courtId ?? null,    // scope for PUBLIC_PROSECUTOR
+            councilId: data.councilId ?? null, // scope for ATTORNEY_GENERAL
+            active: data.active !== false,
+          })
         } else {
           setRole(null)
+          setProfile({ uid: firebaseUser.uid, role: null, active: true })
         }
       } catch (error) {
         // يمكن إضافة تسجيل للأخطاء عند الحاجة
         setRole(null)
+        setProfile(null)
       } finally {
         setLoading(false)
       }
@@ -54,6 +76,7 @@ export function AuthProvider({ children }) {
   const value = {
     user,
     role,
+    profile,
     loading,
     login,
     logout,
