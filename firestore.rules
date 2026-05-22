@@ -93,8 +93,8 @@ service cloud.firestore {
       // Only clerks may register (create) new cases
       allow create: if isClerk();
 
-      // Ownership-enforced updates
-      allow update: if isAuthenticated() && caseNotExpired() && (
+      // Ownership-enforced updates; CLERK is explicitly excluded
+      allow update: if isAuthenticated() && !isClerk() && caseNotExpired() && (
         isCaseOwner() ||
         (isCaseUnassigned() && (isJudge() || isSupervisory()))
       );

@@ -24,7 +24,7 @@ export const ROLES = {
 }
 
 /**
- * Normalise a stored role value to its canonical equivalent.
+ * Normalize a stored role value to its canonical equivalent.
  * Call this wherever role comparisons are made so legacy data is handled transparently.
  */
 export function normalizeRole(role) {
@@ -134,7 +134,7 @@ export function canPerformJudicialAction(userProfile, caseData) {
 /** Returns true when the user is allowed to manage (create/update) other user accounts. */
 export function canManageUsers(userProfile) {
   if (!userProfile) return false
-  return userProfile.role === ROLES.ATTORNEY_GENERAL
+  return normalizeRole(userProfile.role) === ROLES.ATTORNEY_GENERAL
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +161,9 @@ export const PERMISSIONS = {
     canViewInterruptions: true,
     canViewSuspensions: true,
   },
-  // Legacy alias entry – delegates to the same capabilities as JUDGE
+  // Legacy alias entry – INVESTIGATING_JUDGE retains its original limited scope
+  // (judicial investigation interruptions only), preserved for backward compat
+  // with any existing user documents that still carry the old role value.
   [ROLES.INVESTIGATING_JUDGE]: {
     canCreateCase: false,
     canViewData: true,
@@ -173,17 +175,6 @@ export const PERMISSIONS = {
     canViewSuspensions: true,
   },
   [ROLES.PUBLIC_PROSECUTOR]: {
-    canCreateCase: false,
-    canViewData: true,
-    canAddInterruption: true,
-    allowedInterruptionTypes: ['INVESTIGATION', 'PROSECUTION', 'JUDICIAL_INVESTIGATION', 'TRIAL'],
-    canAddSuspension: true,
-    canResumeSuspension: true,
-    canViewInterruptions: true,
-    canViewSuspensions: true,
-  },
-  // Legacy alias entry – delegates to the same capabilities as PUBLIC_PROSECUTOR
-  [ROLES.PROSECUTOR]: {
     canCreateCase: false,
     canViewData: true,
     canAddInterruption: true,
@@ -205,6 +196,9 @@ export const PERMISSIONS = {
     canManageUsers: true,
   },
 }
+
+// Legacy alias: PROSECUTOR shares capabilities with PUBLIC_PROSECUTOR
+PERMISSIONS[ROLES.PROSECUTOR] = PERMISSIONS[ROLES.PUBLIC_PROSECUTOR]
 
 // Legacy helpers preserved for backward compatibility with existing call sites
 
