@@ -34,13 +34,14 @@ export default function تسجيل_الدخول() {
   const [showPassword, setShowPassword] = useState(false)
 
   const from = location.state?.from?.pathname || '/'
+  const normalizedEmail = email.trim()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
-      await login(email.trim(), password)
+      await login(normalizedEmail, password)
       toast.success('تم تسجيل الدخول بنجاح.')
       navigate(from, { replace: true })
     } catch {
@@ -145,7 +146,7 @@ export default function تسجيل_الدخول() {
               <button
                 type="submit"
                 className="btn btn-primary login-submit"
-                disabled={loading || !email.trim() || !password}
+                disabled={loading || !normalizedEmail || !password}
               >
                 {loading ? (
                   <>

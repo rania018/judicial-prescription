@@ -204,5 +204,5 @@ export function getInterruptionTypeLabel(value) {
 
 export function getStatusLabel(value) {
   const normalized = normalizeStatus(value)
-  return STATUS_LABELS[normalized] ?? normalized ?? value
+  return STATUS_LABELS[normalized] ?? value
 }
