@@ -24,16 +24,10 @@ export default function إنشاء_قضية() {
       toast.success(`تم تسجيل القضية رقم ${baseData.caseReference} بنجاح.`)
       navigate(`/القضايا/${created.id}`)
     } catch (err) {
-      // إظهار رسالة الخطأ الفعلية للمساعدة في التشخيص
       // eslint-disable-next-line no-console
       console.error('Create case error:', err)
-      setError(
-        err?.message ||
-          'حدث خطأ أثناء إنشاء القضية. يرجى المحاولة لاحقاً.',
-      )
-      toast.error(
-        err?.message || 'تعذر تسجيل القضية. يرجى المحاولة لاحقاً.',
-      )
+      setError(err?.message || 'حدث خطأ أثناء إنشاء القضية. يرجى المحاولة لاحقاً.')
+      toast.error(err?.message || 'تعذر تسجيل القضية. يرجى المحاولة لاحقاً.')
     } finally {
       setSubmitting(false)
     }
@@ -67,4 +61,3 @@ export default function إنشاء_قضية() {
     </div>
   )
 }
-

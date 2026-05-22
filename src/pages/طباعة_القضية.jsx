@@ -1,16 +1,37 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext.jsx'
 import { getCaseById, listCaseActions } from '../services/caseService'
 import { formatArabicDate } from '../utils/prescription'
 import {
-  getActionTypeLabel,
-  getCaseStageLabel,
   getCrimeTypeLabel,
+  getInterruptionTypeLabel,
   getStatusLabel,
+  getTrackTypeLabel,
 } from '../utils/statusHelpers'
+
+function getPrintActionLabel(action) {
+  if (action.kind === 'SUSPENSION_START') return 'وقف'
+  if (action.kind === 'SUSPENSION_RESUME') return 'تفعيل الأجل'
+  if (action.kind === 'INTERRUPTION') return 'انقطاع'
+  return 'إجراء'
+}
+
+function getPrintActionDetails(action) {
+  if (action.kind === 'INTERRUPTION') {
+    return getInterruptionTypeLabel(action.actionType)
+  }
+
+  if (action.kind === 'SUSPENSION_START') {
+    return action.suspensionReason || 'سبب وقف غير محدد'
+  }
+
+  return action.notes || 'استئناف سريان الأجل'
+}
 
 export default function طباعة_القضية() {
   const { caseId } = useParams()
+  const { user, role, userProfile } = useAuth()
   const [caseData, setCaseData] = useState(null)
   const [actions, setActions] = useState([])
   const [loading, setLoading] = useState(true)
@@ -19,10 +40,19 @@ export default function طباعة_القضية() {
     const load = async () => {
       setLoading(true)
       try {
-        const [c, a] = await Promise.all([
-          getCaseById(caseId),
-          listCaseActions(caseId),
-        ])
+        const c = await getCaseById(caseId, {
+          userId: user?.uid,
+          userRole: role,
+          userContext: userProfile,
+        })
+
+        if (!c) {
+          setCaseData(null)
+          setActions([])
+          return
+        }
+
+        const a = await listCaseActions(caseId)
         setCaseData(c)
         setActions(a)
       } finally {
@@ -30,7 +60,7 @@ export default function طباعة_القضية() {
       }
     }
     load()
-  }, [caseId])
+  }, [caseId, role, user?.uid, userProfile])
 
   if (loading) {
     return (
@@ -43,7 +73,7 @@ export default function طباعة_القضية() {
   if (!caseData) {
     return (
       <div className="print-layout">
-        <p className="muted">لم يتم العثور على القضية المطلوبة.</p>
+        <p className="muted">القضية غير متاحة للطباعة أو غير موجودة.</p>
       </div>
     )
   }
@@ -52,114 +82,78 @@ export default function طباعة_القضية() {
     <div className="print-layout">
       <header className="print-header">
         <div className="print-header-title">وزارة العدل</div>
-        <div className="print-header-subtitle">
-          نظام متابعة آجال التقادم في القضايا الجزائية
-        </div>
+        <div className="print-header-subtitle">بطاقة معلومات قضية جزائية - نسخة محدثة</div>
       </header>
 
       <section className="print-section">
-        <h2 className="print-section-title">بيانات القضية</h2>
+        <h2 className="print-section-title">البيانات الأساسية</h2>
         <table className="print-table">
           <tbody>
             <tr>
-              <th>رمز القضية</th>
-              <td>{caseData.caseCode}</td>
+              <th>1) الرقم</th>
+              <td>{caseData.caseReference}</td>
             </tr>
             <tr>
-              <th>نوع الجريمة</th>
+              <th>2) المسار</th>
+              <td>{getTrackTypeLabel(caseData.trackType)}</td>
+            </tr>
+            <tr>
+              <th>3) التكييف</th>
               <td>{getCrimeTypeLabel(caseData.crimeType)}</td>
             </tr>
             <tr>
-              <th>مصدر القضية</th>
-              <td>
-                {caseData.caseOrigin === 'POLICE'
-                  ? 'محضر شرطة'
-                  : caseData.caseOrigin === 'PROSECUTION'
-                    ? 'النيابة العامة'
-                    : caseData.caseOrigin === 'COURT_FIRST'
-                      ? 'محكمة أول درجة'
-                      : 'غير محدد'}
-              </td>
+              <th>4) الجهة</th>
+              <td>{caseData.judicialAuthority || '—'}</td>
             </tr>
             <tr>
-              <th>مرحلة القضية</th>
-              <td>{getCaseStageLabel(caseData.caseStage)}</td>
+              <th>5) الصفة</th>
+              <td>{caseData.judicialOfficer || '—'}</td>
             </tr>
             <tr>
-              <th>المرحلة القضائية الحالية</th>
-              <td>
-                {caseData.courtLevel === 'FIRST'
-                  ? 'محكمة أول درجة'
-                  : caseData.courtLevel === 'APPEAL'
-                    ? 'محكمة الاستئناف'
-                    : caseData.courtLevel === 'CASSATION'
-                      ? 'محكمة النقض'
-                      : 'لا يوجد'}
-              </td>
+              <th>6) تاريخ الاقتراف</th>
+              <td>{formatArabicDate(caseData.crimeDate)}</td>
             </tr>
             <tr>
-              <th>تاريخ بدء المتابعة الجزائية</th>
-              <td>{formatArabicDate(caseData.prosecutionStartDate)}</td>
+              <th>7) حالة التقادم</th>
+              <td>{getStatusLabel(caseData.status)}</td>
             </tr>
             <tr>
-              <th>تاريخ بدء التقادم</th>
+              <th>8) تاريخ البدء</th>
               <td>{formatArabicDate(caseData.prescriptionStartDate)}</td>
             </tr>
             <tr>
-              <th>تاريخ آخر إجراء</th>
-              <td>{formatArabicDate(caseData.lastActionDate)}</td>
-            </tr>
-            <tr>
-              <th>تاريخ انتهاء التقادم</th>
-              <td>{formatArabicDate(caseData.prescriptionEndDate)}</td>
-            </tr>
-            {caseData.isMinor && (
-              <>
-                <tr>
-                  <th>قاصر</th>
-                  <td>نعم</td>
-                </tr>
-                {caseData.birthDate && (
-                  <tr>
-                    <th>تاريخ الميلاد</th>
-                    <td>{formatArabicDate(caseData.birthDate)}</td>
-                  </tr>
-                )}
-              </>
-            )}
-            {caseData.sentenceDate && (
-              <tr>
-                <th>تاريخ الحكم</th>
-                <td>{formatArabicDate(caseData.sentenceDate)}</td>
-              </tr>
-            )}
-            <tr>
-              <th>حالة التقادم</th>
-              <td>{getStatusLabel(caseData.status)}</td>
+              <th>9) تاريخ السقوط</th>
+              <td>
+                {caseData.prescriptionEndDate
+                  ? formatArabicDate(caseData.prescriptionEndDate)
+                  : 'غير قابل للتقادم'}
+              </td>
             </tr>
           </tbody>
         </table>
       </section>
 
       <section className="print-section">
-        <h2 className="print-section-title">سجل الإجراءات</h2>
+        <h2 className="print-section-title">10) سجل الإجراءات</h2>
         {actions.length === 0 ? (
-          <p className="muted">
-            لا توجد إجراءات مسجّلة على هذه القضية في النظام حتى تاريخ الطباعة.
-          </p>
+          <p className="muted">لا توجد إجراءات مسجلة حتى تاريخ الطباعة.</p>
         ) : (
           <table className="print-table">
             <thead>
               <tr>
-                <th>تاريخ الإجراء</th>
-                <th>نوع الإجراء</th>
+                <th>التاريخ</th>
+                <th>التصنيف</th>
+                <th>التفاصيل</th>
+                <th>تم بواسطة</th>
               </tr>
             </thead>
             <tbody>
               {actions.map((a) => (
                 <tr key={a.id}>
                   <td>{formatArabicDate(a.actionDate)}</td>
-                  <td>{getActionTypeLabel(a.actionType)}</td>
+                  <td>{getPrintActionLabel(a)}</td>
+                  <td>{getPrintActionDetails(a)}</td>
+                  <td>{a.performedBy || '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -169,11 +163,9 @@ export default function طباعة_القضية() {
 
       <section className="print-footer">
         <p className="muted">
-          تم استخراج هذه النسخة من نظام متابعة آجال التقادم للاستخدام الإداري
-          والمرجعي ضمن وزارة العدل.
+          تم استخراج هذه النسخة بعد آخر تحديث إجرائي لضمان تطابق السجل الرقمي مع الملف الورقي.
         </p>
       </section>
     </div>
   )
 }
-

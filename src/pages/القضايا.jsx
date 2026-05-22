@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { listCases } from '../services/caseService'
 import { formatArabicDate } from '../utils/prescription'
 import { getCrimeTypeLabel, getStatusLabel } from '../utils/statusHelpers'
+import { useAuth } from '../context/AuthContext.jsx'
 // @ts-ignore JSX module implemented in JS
 import شارة_الحالة from '../components/شارة_الحالة.jsx'
 // @ts-ignore JSX module implemented in JS
@@ -20,8 +21,10 @@ const STATUS_FILTERS = [
 const CRIME_TYPE_FILTERS = [
   { value: 'ALL', label: 'كل الأنواع' },
   { value: 'FELONY', label: 'جناية' },
-  { value: 'MISDEMEANOR', label: 'جنحة' },
+  { value: 'SIMPLE_MISDEMEANOR', label: 'جنحة بسيطة' },
+  { value: 'AGGRAVATED_MISDEMEANOR', label: 'جنحة مشددة' },
   { value: 'VIOLATION', label: 'مخالفة' },
+  { value: 'EXEMPTED', label: 'مستثنى من السقوط' },
 ]
 
 export default function القضايا() {
@@ -33,9 +36,10 @@ export default function القضايا() {
   const [crimeTypeFilter, setCrimeTypeFilter] = useState(
     location.state?.crimeTypeFilter ?? 'ALL',
   )
-  const [caseCodeFilter, setCaseCodeFilter] = useState('')
+  const [caseReferenceFilter, setCaseReferenceFilter] = useState('')
   const [loading, setLoading] = useState(true)
   const toast = useToast()
+  const { user, role, userProfile } = useAuth()
 
   const navigate = useNavigate()
 
@@ -44,8 +48,11 @@ export default function القضايا() {
     try {
       const data = await listCases({
         status: statusFilter,
-        caseReference: caseCodeFilter,
+        caseReference: caseReferenceFilter,
         crimeType: crimeTypeFilter,
+        userId: user?.uid,
+        userRole: role,
+        userContext: userProfile,
       })
       setCases(data)
     } finally {
@@ -56,7 +63,7 @@ export default function القضايا() {
   useEffect(() => {
     loadCases()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, crimeTypeFilter])
+  }, [statusFilter, crimeTypeFilter, user?.uid, role, userProfile])
 
   const handleFilterSubmit = (e) => {
     e.preventDefault()
@@ -114,7 +121,7 @@ export default function القضايا() {
           <div>
             <div className="card-title">سجل القضايا</div>
             <div className="card-subtitle">
-              استعراض القضايا مع إمكانية التصفية حسب الحالة والبحث برمز القضية.
+              استعراض القضايا المتاحة لك مع إمكانية التصفية حسب الحالة والبحث برقم القضية.
             </div>
           </div>
           <div className="page-actions">
@@ -167,15 +174,15 @@ export default function القضايا() {
           </div>
 
           <div className="form-field">
-            <label className="form-label" htmlFor="caseCodeFilter">
-              رمز القضية
+            <label className="form-label" htmlFor="caseReferenceFilter">
+              رقم القضية
             </label>
             <input
-              id="caseCodeFilter"
+              id="caseReferenceFilter"
               type="text"
               className="form-input"
-              value={caseCodeFilter}
-              onChange={(e) => setCaseCodeFilter(e.target.value)}
+              value={caseReferenceFilter}
+              onChange={(e) => setCaseReferenceFilter(e.target.value)}
             />
           </div>
 
@@ -207,11 +214,12 @@ export default function القضايا() {
             <table>
               <thead>
                 <tr>
-                  <th>رمز القضية</th>
+                  <th>رقم القضية</th>
                   <th>نوع الجريمة</th>
                   <th>تاريخ آخر إجراء</th>
                   <th>تاريخ انتهاء التقادم</th>
                   <th>الحالة</th>
+                  <th>وضع الوصول</th>
                 </tr>
               </thead>
               <tbody>
@@ -230,6 +238,7 @@ export default function القضايا() {
                         <شارة_الحالة status={c.status} />
                       </span>
                     </td>
+                    <td>{c.isEditable ? 'قابل للتصرف' : 'اطلاع فقط'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -240,4 +249,3 @@ export default function القضايا() {
     </div>
   )
 }
-

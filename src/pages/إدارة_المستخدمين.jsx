@@ -1,17 +1,12 @@
 import { useEffect, useState } from 'react'
-import { listUsers, updateUserRoleAndActive, updateUserProfile } from '../services/userService'
+import {
+  AVAILABLE_ROLES,
+  listUsers,
+  updateUserProfile,
+  updateUserRoleAndActive,
+} from '../services/userService'
 // @ts-ignore JSX module implemented in JS
 import { useToast } from '../context/ToastContext.jsx'
-
-const ROLES = [
-  { value: 'CLERK', label: 'أمين الضبط' },
-  { value: 'JUDGE', label: 'قاضٍ' },
-  { value: 'PUBLIC_PROSECUTOR', label: 'وكيل الجمهورية' },
-  { value: 'ATTORNEY_GENERAL', label: 'النائب العام' },
-  // Legacy entries so existing records display correctly in the dropdown
-  { value: 'INVESTIGATING_JUDGE', label: 'قاضي التحقيق (قديم)' },
-  { value: 'PROSECUTOR', label: 'النيابة العامة (قديم)' },
-]
 
 export default function إدارة_المستخدمين() {
   const [users, setUsers] = useState([])
@@ -27,7 +22,7 @@ export default function إدارة_المستخدمين() {
       const data = await listUsers()
       data.sort((a, b) => a.id.localeCompare(b.id))
       setUsers(data)
-    } catch (e) {
+    } catch {
       setError('تعذر تحميل قائمة المستخدمين. يرجى المحاولة لاحقاً.')
     } finally {
       setLoading(false)
@@ -43,11 +38,9 @@ export default function إدارة_المستخدمين() {
     setError('')
     try {
       await updateUserRoleAndActive(id, { role })
-      setUsers((prev) =>
-        prev.map((u) => (u.id === id ? { ...u, role } : u)),
-      )
+      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, role } : u)))
       toast.success('تم تحديث صلاحيات المستخدم بنجاح.')
-    } catch (e) {
+    } catch {
       setError('تعذر تحديث صلاحيات المستخدم. يرجى المحاولة لاحقاً.')
       toast.error('تعذر تحديث صلاحيات المستخدم. يرجى المحاولة لاحقاً.')
     } finally {
@@ -61,13 +54,9 @@ export default function إدارة_المستخدمين() {
     setError('')
     try {
       await updateUserRoleAndActive(id, { active: nextActive })
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === id ? { ...u, active: nextActive } : u,
-        ),
-      )
+      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, active: nextActive } : u)))
       toast.success('تم تحديث حالة الحساب بنجاح.')
-    } catch (e) {
+    } catch {
       setError('تعذر تحديث حالة الحساب. يرجى المحاولة لاحقاً.')
       toast.error('تعذر تحديث حالة الحساب. يرجى المحاولة لاحقاً.')
     } finally {
@@ -84,7 +73,7 @@ export default function إدارة_المستخدمين() {
         prev.map((u) => (u.id === id ? { ...u, [field]: value || null } : u)),
       )
       toast.success('تم تحديث نطاق الاختصاص بنجاح.')
-    } catch (e) {
+    } catch {
       setError('تعذر تحديث نطاق الاختصاص. يرجى المحاولة لاحقاً.')
       toast.error('تعذر تحديث نطاق الاختصاص. يرجى المحاولة لاحقاً.')
     } finally {
@@ -167,15 +156,13 @@ export default function إدارة_المستخدمين() {
                       <select
                         className="form-select"
                         value={u.role ?? ''}
-                        onChange={(e) =>
-                          handleChangeRole(u.id, e.target.value)
-                        }
+                        onChange={(e) => handleChangeRole(u.id, e.target.value)}
                         disabled={savingId === u.id}
                       >
                         <option value="" disabled>
                           اختر الدور
                         </option>
-                        {ROLES.map((r) => (
+                        {AVAILABLE_ROLES.map((r) => (
                           <option key={r.value} value={r.value}>
                             {r.label}
                           </option>
@@ -218,9 +205,7 @@ export default function إدارة_المستخدمين() {
                             ? 'btn btn-secondary btn-sm'
                             : 'btn btn-primary btn-sm'
                         }
-                        onClick={() =>
-                          handleToggleActive(u.id, u.active !== false)
-                        }
+                        onClick={() => handleToggleActive(u.id, u.active !== false)}
                         disabled={savingId === u.id}
                       >
                         {u.active === false ? 'موقوف' : 'نشط'}
@@ -237,4 +222,3 @@ export default function إدارة_المستخدمين() {
     </div>
   )
 }
-

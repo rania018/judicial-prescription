@@ -6,21 +6,13 @@ import {
 } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
 import { auth, db } from '../firebase/config'
+import { normalizeRole } from '../utils/rbacHelper'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [role, setRole] = useState(null)
-  /**
-   * Full user profile loaded from Firestore.
-   * Shape: { uid, role, displayName, courtId, councilId, active }
-   *
-   * courtId  – organisational scope for PUBLIC_PROSECUTOR (وكيل الجمهورية)
-   * councilId – organisational scope for ATTORNEY_GENERAL (النائب العام)
-   *
-   * These fields drive the ownership-aware permission helpers in rbacHelper.js.
-   */
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -39,22 +31,21 @@ export function AuthProvider({ children }) {
         const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid))
         if (userDoc.exists()) {
           const data = userDoc.data()
-          const userRole = data.role ?? null
-          setRole(userRole)
+          const normalizedRole = normalizeRole(data.role ?? null)
+          setRole(normalizedRole)
           setProfile({
             uid: firebaseUser.uid,
-            role: userRole,
+            role: normalizedRole,
             displayName: data.displayName ?? firebaseUser.displayName ?? null,
-            courtId: data.courtId ?? null,    // scope for PUBLIC_PROSECUTOR
-            councilId: data.councilId ?? null, // scope for ATTORNEY_GENERAL
+            courtId: data.courtId ?? null,
+            councilId: data.councilId ?? null,
             active: data.active !== false,
           })
         } else {
           setRole(null)
           setProfile({ uid: firebaseUser.uid, role: null, active: true })
         }
-      } catch (error) {
-        // يمكن إضافة تسجيل للأخطاء عند الحاجة
+      } catch {
         setRole(null)
         setProfile(null)
       } finally {
@@ -77,6 +68,8 @@ export function AuthProvider({ children }) {
     user,
     role,
     profile,
+    // alias for compatibility with pre-merge Phase 2 code
+    userProfile: profile,
     loading,
     login,
     logout,
@@ -92,4 +85,3 @@ export function useAuth() {
   }
   return context
 }
-
