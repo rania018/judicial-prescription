@@ -32,10 +32,25 @@ export async function updateUserRoleAndActive(id, { role, active }) {
   await updateDoc(ref, payload)
 }
 
-// Export available roles for use in UI
+export async function updateUserProfile(
+  id,
+  { role, active, displayName, courtId, councilId } = {},
+) {
+  const ref = doc(db, USERS_COLLECTION, id)
+  const payload = {}
+  if (role !== undefined) payload.role = role
+  if (typeof active === 'boolean') payload.active = active
+  if (displayName !== undefined) payload.displayName = displayName
+  if (courtId !== undefined) payload.courtId = courtId
+  if (councilId !== undefined) payload.councilId = councilId
+  await updateDoc(ref, payload)
+}
+
 export const AVAILABLE_ROLES = [
   { value: 'CLERK', label: 'أمين الضبط' },
   { value: 'JUDGE', label: 'قاضٍ' },
   { value: 'PUBLIC_PROSECUTOR', label: 'وكيل الجمهورية' },
-  { value: 'ATTORNEY_GENERAL', label: 'المحامي العام' },
+  { value: 'ATTORNEY_GENERAL', label: 'النائب العام' },
+  { value: 'INVESTIGATING_JUDGE', label: 'قاضي التحقيق (قديم)' },
+  { value: 'PROSECUTOR', label: 'النيابة العامة (قديم)' },
 ]

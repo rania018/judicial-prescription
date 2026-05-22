@@ -22,7 +22,7 @@ export default function سجل_إجراءات_التقادم({
   const today = new Date().toISOString().split('T')[0]
   const interruptions = caseData.interruptionHistory || []
   const suspensions = caseData.suspensionHistory || []
-  const activeSuspension = suspensions.find((s) => !s.endDate)
+  const activeSuspension = suspensions.find((suspension) => !suspension.endDate)
 
   const historyEntries = useMemo(() => {
     const interruptionEntries = interruptions.map((entry) => ({
@@ -46,9 +46,7 @@ export default function سجل_إجراءات_التقادم({
         notes: suspension.notes || '—',
       }
 
-      if (!suspension.endDate) {
-        return [started]
-      }
+      if (!suspension.endDate) return [started]
 
       return [
         started,
@@ -91,9 +89,7 @@ export default function سجل_إجراءات_التقادم({
       return
     }
 
-    onResumeSuspension({
-      actionDate: new Date(resumeDate),
-    })
+    onResumeSuspension({ actionDate: new Date(resumeDate) })
     setShowResumeForm(false)
     setResumeDate('')
   }

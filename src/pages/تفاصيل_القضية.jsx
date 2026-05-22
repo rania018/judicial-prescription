@@ -19,7 +19,7 @@ import سجل_إجراءات_التقادم from '../components/سجل_إجرا�
 
 export default function تفاصيل_القضية() {
   const { caseId } = useParams()
-  const { user, role, userProfile } = useAuth()
+  const { user, role, profile } = useAuth()
   const navigate = useNavigate()
   const [caseData, setCaseData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -28,7 +28,7 @@ export default function تفاصيل_القضية() {
   useEffect(() => {
     loadCaseDetails()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [caseId, user?.uid, role])
+  }, [caseId, user?.uid, role, profile?.courtId, profile?.councilId])
 
   const loadCaseDetails = async () => {
     try {
@@ -37,7 +37,7 @@ export default function تفاصيل_القضية() {
       const data = await getCaseById(caseId, {
         userId: user?.uid,
         userRole: role,
-        userContext: userProfile,
+        userContext: profile,
       })
 
       if (!data) {
@@ -56,7 +56,7 @@ export default function تفاصيل_القضية() {
 
   const handleAddInterruption = async (interruptionData) => {
     try {
-      await addCaseInterruption(caseId, interruptionData, user.uid, role, caseData)
+      await addCaseInterruption(caseId, interruptionData, user.uid, role, caseData, profile)
       await loadCaseDetails()
     } catch (err) {
       // eslint-disable-next-line no-console
@@ -67,7 +67,7 @@ export default function تفاصيل_القضية() {
 
   const handleAddSuspension = async (suspensionData) => {
     try {
-      await addCaseSuspension(caseId, suspensionData, user.uid, role, caseData)
+      await addCaseSuspension(caseId, suspensionData, user.uid, role, caseData, profile)
       await loadCaseDetails()
     } catch (err) {
       // eslint-disable-next-line no-console
@@ -78,7 +78,7 @@ export default function تفاصيل_القضية() {
 
   const handleResumeSuspension = async (resumeData) => {
     try {
-      await resumeCaseFromSuspension(caseId, resumeData, user.uid, role, caseData)
+      await resumeCaseFromSuspension(caseId, resumeData, user.uid, role, caseData, profile)
       await loadCaseDetails()
     } catch (err) {
       // eslint-disable-next-line no-console

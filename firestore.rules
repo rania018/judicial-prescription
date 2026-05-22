@@ -14,49 +14,109 @@ service cloud.firestore {
       return isAuthenticated() && getUserRole() == "CLERK";
     }
 
-    function isProsecutorOrAttorney() {
-      return isAuthenticated() && getUserRole() in ["PROSECUTOR", "ATTORNEY_GENERAL"];
+    // Accepts both the new canonical JUDGE value and the legacy INVESTIGATING_JUDGE
+    function isJudge() {
+      return isAuthenticated() && getUserRole() in ["JUDGE", "INVESTIGATING_JUDGE"];
+    }
+
+    // Accepts both the new canonical PUBLIC_PROSECUTOR and the legacy PROSECUTOR
+    function isPublicProsecutor() {
+      return isAuthenticated() && getUserRole() in ["PUBLIC_PROSECUTOR", "PROSECUTOR"];
     }
 
     function isAttorneyGeneral() {
       return isAuthenticated() && getUserRole() == "ATTORNEY_GENERAL";
     }
 
+    // Any role with supervisory (read-only) oversight capability
+    function isSupervisory() {
+      return isPublicProsecutor() || isAttorneyGeneral();
+    }
+
+    // Case is still within a modifiable state
     function caseNotExpired() {
-      return resource.data.status != "EXPIRED";
+      return resource.data.status != "EXPIRED" && resource.data.status != "NON_PRESCRIPTIBLE";
     }
 
-    function statusUnchanged() {
-      return request.resource.data.status == resource.data.status;
+    // Current user is the assigned owner of the case
+    // Uses get() with a default of null so legacy cases without assignedTo also match cleanly.
+    function isCaseOwner() {
+      return resource.data.get("assignedTo", null) == request.auth.uid;
     }
 
-    // إدارة المستخدمين:
-    // - القراءة: مسموحة لكل مستخدم مصادق عليه (لعرض صلاحياته من الواجهة عند الحاجة)
-    // - الكتابة: محصورة بالمستخدمين ذوي الدور ATTORNEY_GENERAL
+    // Case has no owner yet (legacy data or newly created unassigned case)
+    function isCaseUnassigned() {
+      return resource.data.get("assignedTo", null) == null;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Users collection
+    // ---------------------------------------------------------------------------
+    // Read: any authenticated user (needed for role lookups in the app UI)
+    // Write: only ATTORNEY_GENERAL
     match /users/{userId} {
       allow read: if isAuthenticated();
       allow write: if isAttorneyGeneral();
     }
 
-    // سجلات الأثر الرقابي (دون بيانات شخصية):
-    // - الإنشاء: مسموح لأي مستخدم مصادق عليه
-    // - القراءة: محصورة بالمستخدمين بدور محام عام
+    // ---------------------------------------------------------------------------
+    // Audit logs
+    // ---------------------------------------------------------------------------
     match /auditLogs/{logId} {
       allow create: if isAuthenticated();
       allow read: if isAttorneyGeneral();
       allow update, delete: if false;
     }
 
+    // ---------------------------------------------------------------------------
+    // Cases collection
+    // ---------------------------------------------------------------------------
+    // Phase 1 access-control model:
+    //
+    //  CREATE  – CLERK only (they register cases on behalf of judges)
+    //
+    //  READ    – all authenticated users for now; court/council scope filtering
+    //            is enforced at the application layer.  Full Firestore-level read
+    //            scoping (courtId / councilId comparison) requires reading the
+    //            user document on every case read and is planned for Phase 2 once
+    //            indexes and caching are in place.
+    //
+    //  UPDATE  – judicial officers only, and only on cases they own (assignedTo ==
+    //            uid).  Unassigned legacy cases retain the previous behaviour
+    //            (any judge or supervisory role may update them) to avoid breaking
+    //            existing data.  CLERK is never allowed to update.
+    //
+    //  DELETE  – never
     match /cases/{caseId} {
       allow read: if isAuthenticated();
+
+      // Only clerks may register (create) new cases
       allow create: if isClerk();
-      allow update: if isProsecutorOrAttorney() && caseNotExpired() && statusUnchanged();
+
+      // Ownership-enforced updates; CLERK is explicitly excluded
+      allow update: if isAuthenticated() && !isClerk() && caseNotExpired() && (
+        isCaseOwner() ||
+        (isCaseUnassigned() && (isJudge() || isSupervisory()))
+      );
+
       allow delete: if false;
 
-      match /actions/{actionId} {
+      // Interruption sub-collection
+      match /interruptions/{interruptionId} {
         allow read: if isAuthenticated();
-        allow create: if isProsecutorOrAttorney() && get(/databases/$(database)/documents/cases/$(caseId)).data.status != "EXPIRED";
+        allow create: if isAuthenticated() && (isJudge() || isSupervisory()) &&
+          get(/databases/$(database)/documents/cases/$(caseId)).data.status != "EXPIRED";
         allow update, delete: if false;
+      }
+
+      // Suspension sub-collection
+      match /suspensions/{suspensionId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() && (isJudge() || isSupervisory()) &&
+          get(/databases/$(database)/documents/cases/$(caseId)).data.status != "EXPIRED";
+        // Resuming a suspension updates the existing document (adds endDate)
+        allow update: if isAuthenticated() && (isJudge() || isSupervisory());
+        allow delete: if false;
       }
     }
   }

@@ -9,7 +9,7 @@ import { useToast } from '../context/ToastContext.jsx'
 import نموذج_قضية from '../components/نموذج_قضية.jsx'
 
 export default function إنشاء_قضية() {
-  const { user, role, userProfile } = useAuth()
+  const { user, profile } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
   const [submitting, setSubmitting] = useState(false)
@@ -20,24 +20,14 @@ export default function إنشاء_قضية() {
     setError('')
     setSubmitting(true)
     try {
-      const created = await createCase(baseData, user.uid, {
-        role,
-        courtId: userProfile?.courtId,
-        councilId: userProfile?.councilId,
-      })
+      const created = await createCase(baseData, user.uid, profile)
       toast.success(`تم تسجيل القضية رقم ${baseData.caseReference} بنجاح.`)
       navigate(`/القضايا/${created.id}`)
     } catch (err) {
-      // إظهار رسالة الخطأ الفعلية للمساعدة في التشخيص
       // eslint-disable-next-line no-console
       console.error('Create case error:', err)
-      setError(
-        err?.message ||
-          'حدث خطأ أثناء إنشاء القضية. يرجى المحاولة لاحقاً.',
-      )
-      toast.error(
-        err?.message || 'تعذر تسجيل القضية. يرجى المحاولة لاحقاً.',
-      )
+      setError(err?.message || 'حدث خطأ أثناء إنشاء القضية. يرجى المحاولة لاحقاً.')
+      toast.error(err?.message || 'تعذر تسجيل القضية. يرجى المحاولة لاحقاً.')
     } finally {
       setSubmitting(false)
     }

@@ -24,16 +24,14 @@ const CASES_COLLECTION = 'cases'
 
 function normalizeCaseRecord(data) {
   if (!data) return data
-  const caseReference = data.caseReference || data.caseCode || ''
   return {
     ...data,
-    caseReference,
+    caseReference: data.caseReference || data.caseCode || '',
   }
 }
 
-function computeStatusFromEndDate(prescriptionEndDate) {
+export function computeCaseStatus(prescriptionEndDate) {
   if (prescriptionEndDate === null) return 'NON_PRESCRIPTIBLE'
-
   const daysRemaining = getDaysRemaining(prescriptionEndDate)
   if (daysRemaining === null) return 'ACTIVE'
   if (daysRemaining <= 0) return 'EXPIRED'
@@ -50,8 +48,8 @@ function toDate(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
-function assertJudicialEditAllowed({ userRole, userId, caseData }) {
-  const accessLevel = getCaseAccessLevel({ userId, userRole, caseData })
+function assertJudicialEditAllowed({ userRole, userId, caseData, userContext }) {
+  const accessLevel = getCaseAccessLevel({ userId, userRole, caseData, userContext })
   if (!canTakeJudicialActions(userRole, accessLevel)) {
     throw new Error('لا تملك صلاحية اتخاذ إجراءات قضائية على هذه القضية.')
   }
@@ -70,8 +68,8 @@ function assertActionDateNotFuture(actionDate) {
   }
 }
 
-export async function createCase(baseData, userId, userContext = {}) {
-  const normalizedRole = normalizeRole(userContext.role)
+export async function createCase(baseData, userId, userProfile = {}) {
+  const normalizedRole = normalizeRole(userProfile.role)
   const assignedTo = baseData.assignedTo || userId
 
   const { prescriptionStartDate, prescriptionEndDate } = calculatePrescription({
@@ -98,12 +96,12 @@ export async function createCase(baseData, userId, userContext = {}) {
     minorBirthDate: baseData.minorBirthDate || null,
     prescriptionStartDate,
     prescriptionEndDate,
-    status: computeStatusFromEndDate(prescriptionEndDate),
+    status: computeCaseStatus(prescriptionEndDate),
     assignedTo,
     createdBy: userId,
     createdByRole: normalizedRole || null,
-    courtId: baseData.courtId || userContext.courtId || null,
-    councilId: baseData.councilId || userContext.councilId || null,
+    courtId: baseData.courtId || userProfile.courtId || null,
+    councilId: baseData.councilId || userProfile.councilId || null,
     createdAt: serverTimestamp(),
     interruptionHistory: [],
     suspensionHistory: [],
@@ -121,6 +119,7 @@ export async function createCase(baseData, userId, userContext = {}) {
       assignedTo,
     },
   })
+
   return { id: ref.id, ...normalizeCaseRecord(snapshot.data()) }
 }
 
@@ -129,10 +128,11 @@ export async function listCases({
   caseReference,
   caseCode,
   crimeType,
+  assignedTo,
   userId,
   userRole,
   userContext,
-}) {
+} = {}) {
   const colRef = collection(db, CASES_COLLECTION)
   const baseConstraints = []
 
@@ -140,11 +140,16 @@ export async function listCases({
     baseConstraints.push(where('status', '==', status))
   }
 
-  const normalizedReference = (caseReference || caseCode || '').trim()
-  const hasReferenceFilter = normalizedReference.length > 0
   if (crimeType && crimeType !== 'ALL') {
     baseConstraints.push(where('crimeType', '==', crimeType))
   }
+
+  if (assignedTo) {
+    baseConstraints.push(where('assignedTo', '==', assignedTo))
+  }
+
+  const normalizedReference = (caseReference || caseCode || '').trim()
+  const hasReferenceFilter = normalizedReference.length > 0
 
   const referenceConstraints = hasReferenceFilter
     ? [...baseConstraints, where('caseReference', '==', normalizedReference)]
@@ -164,12 +169,14 @@ export async function listCases({
   return docs
     .map((docSnap) => {
       const data = normalizeCaseRecord(docSnap.data())
-      const accessLevel = getCaseAccessLevel({
-        userId,
-        userRole,
-        userContext,
-        caseData: data,
-      })
+      const accessLevel = userId
+        ? getCaseAccessLevel({
+            userId,
+            userRole,
+            userContext,
+            caseData: data,
+          })
+        : 'edit'
       return {
         id: docSnap.id,
         ...data,
@@ -177,7 +184,7 @@ export async function listCases({
         isEditable: accessLevel === 'edit',
       }
     })
-    .filter((caseData) => caseData.accessLevel !== 'none')
+    .filter((caseData) => !userId || caseData.accessLevel !== 'none')
 }
 
 export async function getCaseById(caseId, accessOptions = {}) {
@@ -188,12 +195,14 @@ export async function getCaseById(caseId, accessOptions = {}) {
   }
 
   const data = normalizeCaseRecord(snapshot.data())
-  const accessLevel = getCaseAccessLevel({
-    userId: accessOptions.userId,
-    userRole: accessOptions.userRole,
-    userContext: accessOptions.userContext,
-    caseData: data,
-  })
+  const accessLevel = accessOptions.userId
+    ? getCaseAccessLevel({
+        userId: accessOptions.userId,
+        userRole: accessOptions.userRole,
+        userContext: accessOptions.userContext,
+        caseData: data,
+      })
+    : 'edit'
 
   if (accessOptions.userId && accessLevel === 'none') {
     return null
@@ -234,15 +243,16 @@ export async function listCaseActions(caseId) {
       return [startEntry]
     }
 
-    const resumeEntry = {
-      id: `suspend-resume-${entry.id || entry.endDate}`,
-      actionDate: entry.endDate,
-      kind: 'SUSPENSION_RESUME',
-      notes: 'تفعيل الأجل بعد زوال سبب الوقف',
-      performedBy: entry.resumedBy,
-    }
-
-    return [startEntry, resumeEntry]
+    return [
+      startEntry,
+      {
+        id: `suspend-resume-${entry.id || entry.endDate}`,
+        actionDate: entry.endDate,
+        kind: 'SUSPENSION_RESUME',
+        notes: 'تفعيل الأجل بعد زوال سبب الوقف',
+        performedBy: entry.resumedBy,
+      },
+    ]
   })
 
   return [...interruptions, ...suspensions].sort((a, b) => {
@@ -258,12 +268,13 @@ export async function addCaseInterruption(
   userId,
   userRole,
   caseData,
+  userContext,
 ) {
   if (caseData.status === 'EXPIRED' || caseData.status === 'NON_PRESCRIPTIBLE') {
     throw new Error('لا يمكن تعديل حالة تقادم قضية منتهية أو مستثناة.')
   }
 
-  assertJudicialEditAllowed({ userRole, userId, caseData })
+  assertJudicialEditAllowed({ userRole, userId, caseData, userContext })
   if (!canPerformInterruptionType(userRole, baseInterruption.actionType)) {
     throw new Error('نوع إجراء الانقطاع غير مسموح لهذا الدور.')
   }
@@ -317,7 +328,7 @@ export async function addCaseInterruption(
     interruptionHistory: updatedInterruptionHistory,
     prescriptionStartDate,
     prescriptionEndDate,
-    status: computeStatusFromEndDate(prescriptionEndDate),
+    status: computeCaseStatus(prescriptionEndDate),
   })
 }
 
@@ -327,12 +338,13 @@ export async function addCaseSuspension(
   userId,
   userRole,
   caseData,
+  userContext,
 ) {
   if (caseData.status === 'EXPIRED' || caseData.status === 'NON_PRESCRIPTIBLE') {
     throw new Error('لا يمكن تعديل حالة تقادم قضية منتهية أو مستثناة.')
   }
 
-  assertJudicialEditAllowed({ userRole, userId, caseData })
+  assertJudicialEditAllowed({ userRole, userId, caseData, userContext })
   assertActionDateNotFuture(suspensionData.actionDate)
 
   const hasActiveSuspension = (caseData.suspensionHistory || []).some(
@@ -396,7 +408,7 @@ export async function addCaseSuspension(
     suspensionHistory: updatedSuspensionHistory,
     prescriptionStartDate,
     prescriptionEndDate,
-    status: computeStatusFromEndDate(prescriptionEndDate),
+    status: computeCaseStatus(prescriptionEndDate),
   })
 }
 
@@ -406,12 +418,13 @@ export async function resumeCaseFromSuspension(
   userId,
   userRole,
   caseData,
+  userContext,
 ) {
   if (caseData.status === 'EXPIRED' || caseData.status === 'NON_PRESCRIPTIBLE') {
     throw new Error('لا يمكن تعديل حالة تقادم قضية منتهية أو مستثناة.')
   }
 
-  assertJudicialEditAllowed({ userRole, userId, caseData })
+  assertJudicialEditAllowed({ userRole, userId, caseData, userContext })
   assertActionDateNotFuture(resumeData.actionDate)
 
   const activeSuspension = (caseData.suspensionHistory || []).find(
@@ -462,7 +475,7 @@ export async function resumeCaseFromSuspension(
     suspensionHistory: updatedSuspensionHistory,
     prescriptionStartDate,
     prescriptionEndDate,
-    status: computeStatusFromEndDate(prescriptionEndDate),
+    status: computeCaseStatus(prescriptionEndDate),
   })
 
   await addAuditLog({
