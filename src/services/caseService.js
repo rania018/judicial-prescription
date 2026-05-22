@@ -335,7 +335,9 @@ export async function addCaseSuspension(
   assertJudicialEditAllowed({ userRole, userId, caseData })
   assertActionDateNotFuture(suspensionData.actionDate)
 
-  const hasActiveSuspension = (caseData.suspensionHistory || []).some((s) => !s.endDate)
+  const hasActiveSuspension = (caseData.suspensionHistory || []).some(
+    (suspension) => !suspension.endDate,
+  )
   if (hasActiveSuspension) {
     throw new Error('لا يمكن إضافة وقف جديد قبل تفعيل الأجل للوقف النشط.')
   }
@@ -412,7 +414,9 @@ export async function resumeCaseFromSuspension(
   assertJudicialEditAllowed({ userRole, userId, caseData })
   assertActionDateNotFuture(resumeData.actionDate)
 
-  const activeSuspension = (caseData.suspensionHistory || []).find((s) => !s.endDate)
+  const activeSuspension = (caseData.suspensionHistory || []).find(
+    (suspension) => !suspension.endDate,
+  )
   if (!activeSuspension) {
     throw new Error('لا توجد حالة وقف نشطة لهذه القضية.')
   }
@@ -430,7 +434,9 @@ export async function resumeCaseFromSuspension(
   })
 
   const updatedSuspensionHistory = [...(caseData.suspensionHistory || [])]
-  const idx = updatedSuspensionHistory.findIndex((s) => s.id === activeSuspension.id)
+  const idx = updatedSuspensionHistory.findIndex(
+    (suspension) => suspension.id === activeSuspension.id,
+  )
   if (idx !== -1) {
     updatedSuspensionHistory[idx] = {
       ...updatedSuspensionHistory[idx],

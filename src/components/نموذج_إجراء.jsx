@@ -7,6 +7,7 @@ const ACTION_TYPES = [
   { value: 'JUDICIAL_INVESTIGATION', label: 'إجراءات التحقيق القضائي (قاضي التحقيق)' },
   { value: 'TRIAL', label: 'إجراءات المحاكمة' },
 ]
+const MIN_SUSPENSION_REASON_LENGTH = 5
 
 export default function نموذج_إجراء({ onSubmit, submitting, disabled, actionMode = 'INTERRUPTION' }) {
   const [actionType, setActionType] = useState('INVESTIGATION')
@@ -23,7 +24,7 @@ export default function نموذج_إجراء({ onSubmit, submitting, disabled, 
   
   const isValid = isInterruptionMode 
     ? actionType && actionDate !== '' 
-    : actionDate !== '' && suspensionReason.trim().length >= 5
+    : actionDate !== '' && suspensionReason.trim().length >= MIN_SUSPENSION_REASON_LENGTH
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -90,7 +91,9 @@ export default function نموذج_إجراء({ onSubmit, submitting, disabled, 
               disabled={disabled}
               rows="3"
             />
-            <p className="muted">اكتب السبب القانوني/المادي للوقف (5 أحرف على الأقل).</p>
+            <p className="muted">
+              اكتب السبب القانوني/المادي للوقف ({MIN_SUSPENSION_REASON_LENGTH} أحرف على الأقل).
+            </p>
           </div>
         )}
 

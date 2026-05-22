@@ -219,7 +219,7 @@ export function calculatePrescription({
     suspensionHistory.forEach(suspension => {
       const startDate = new Date(suspension.startDate);
       const endDate = suspension.endDate ? new Date(suspension.endDate) : new Date();
-      if (startDate <= endDate) {
+      if (startDate < endDate) {
         const diffTime = endDate - startDate;
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         totalSuspensionDays += diffDays;

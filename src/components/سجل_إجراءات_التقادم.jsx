@@ -35,30 +35,30 @@ export default function سجل_إجراءات_التقادم({
       notes: entry.notes || '—',
     }))
 
-    const suspensionEntries = suspensions.flatMap((entry) => {
+    const suspensionEntries = suspensions.flatMap((suspension) => {
       const started = {
-        id: `susp-start-${entry.id || entry.startDate}`,
-        date: entry.startDate,
+        id: `susp-start-${suspension.id || suspension.startDate}`,
+        date: suspension.startDate,
         type: 'SUSPENSION_START',
         label: 'وقف',
-        details: entry.reason || '—',
-        by: entry.suspendedByName || entry.suspendedBy || '—',
-        notes: entry.notes || '—',
+        details: suspension.reason || '—',
+        by: suspension.suspendedByName || suspension.suspendedBy || '—',
+        notes: suspension.notes || '—',
       }
 
-      if (!entry.endDate) {
+      if (!suspension.endDate) {
         return [started]
       }
 
       return [
         started,
         {
-          id: `susp-resume-${entry.id || entry.endDate}`,
-          date: entry.endDate,
+          id: `susp-resume-${suspension.id || suspension.endDate}`,
+          date: suspension.endDate,
           type: 'SUSPENSION_RESUME',
           label: 'تفعيل الأجل',
           details: 'استئناف سريان التقادم بعد زوال المانع',
-          by: entry.resumedByName || entry.resumedBy || '—',
+          by: suspension.resumedByName || suspension.resumedBy || '—',
           notes: '—',
         },
       ]
