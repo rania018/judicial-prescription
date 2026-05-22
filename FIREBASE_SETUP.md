@@ -67,7 +67,7 @@ const firebaseConfig = {
 4. أضف حقل:
    - **الحقل**: `role`
    - **النوع**: string
-   - **القيمة**: واحدة من: `PROSECUTOR` أو `CLERK` أو `ATTORNEY_GENERAL`
+   - **القيمة**: واحدة من: `CLERK` أو `JUDGE` أو `PUBLIC_PROSECUTOR` أو `ATTORNEY_GENERAL`
 5. احفظ المستند.
 6. كرر لإضافة مستخدمين آخرين (كل مستند معرّفه = UID من Authentication).
 
@@ -83,7 +83,7 @@ const firebaseConfig = {
 4. انسخ **User UID** المعروض.
 5. في Firestore، أنشئ مستنداً جديداً داخل مجموعة **`users`**:
    - **معرّف المستند** = نفس الـ UID.
-   - حقل `role` = `CLERK` (أو `PROSECUTOR` / `ATTORNEY_GENERAL`).
+   - حقل `role` = `CLERK` (أو `JUDGE` / `PUBLIC_PROSECUTOR` / `ATTORNEY_GENERAL`).
 6. بعد ذلك يمكنك تسجيل الدخول من الواجهة بهذا البريد وكلمة المرور.
 
 ---
@@ -153,5 +153,5 @@ firebase deploy --only hosting
 ## استكشاف الأخطاء
 
 - **لا أستطيع تسجيل الدخول**: تأكد أن البريد/كلمة المرور صحيحان في Authentication، وأن مستند المستخدم في `users` موجود وبه حقل `role`.
-- **صلاحية غير كافية**: تحقق أن قيمة `role` في Firestore هي واحدة من: `PROSECUTOR`, `CLERK`, `ATTORNEY_GENERAL`.
+- **صلاحية غير كافية**: تحقق أن قيمة `role` في Firestore هي واحدة من: `CLERK`, `JUDGE`, `PUBLIC_PROSECUTOR`, `ATTORNEY_GENERAL`.
 - **أخطاء Firestore**: راجع تبويب **Rules** في Firestore وتأكد أن القواعد المطبقة هي نفس ملف `firestore.rules` في المشروع.

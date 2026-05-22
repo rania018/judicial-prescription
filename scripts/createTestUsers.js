@@ -12,11 +12,38 @@
 import admin from 'firebase-admin'
 
 const TEST_PASSWORD = 'test123'
+const SHARED_COURT_ID = 'COURT-01'
+const SHARED_COUNCIL_ID = 'COUNCIL-01'
 
 const TEST_ACCOUNTS = [
-  { email: 'clerk@test.com', role: 'CLERK' },
-  { email: 'prosecutor@test.com', role: 'PROSECUTOR' },
-  { email: 'attorney@test.com', role: 'ATTORNEY_GENERAL' },
+  {
+    email: 'clerk@test.com',
+    role: 'CLERK',
+    displayName: 'أمين الضبط (تجريبي)',
+    courtId: SHARED_COURT_ID,
+    councilId: SHARED_COUNCIL_ID,
+  },
+  {
+    email: 'judge@test.com',
+    role: 'JUDGE',
+    displayName: 'قاضٍ (تجريبي)',
+    courtId: SHARED_COURT_ID,
+    councilId: SHARED_COUNCIL_ID,
+  },
+  {
+    email: 'prosecutor@test.com',
+    role: 'PUBLIC_PROSECUTOR',
+    displayName: 'وكيل الجمهورية (تجريبي)',
+    courtId: SHARED_COURT_ID,
+    councilId: SHARED_COUNCIL_ID,
+  },
+  {
+    email: 'attorney@test.com',
+    role: 'ATTORNEY_GENERAL',
+    displayName: 'النائب العام (تجريبي)',
+    courtId: SHARED_COURT_ID,
+    councilId: SHARED_COUNCIL_ID,
+  },
 ]
 
 async function run() {
@@ -27,7 +54,9 @@ async function run() {
   const auth = admin.auth()
   const db = admin.firestore()
 
-  for (const { email, role } of TEST_ACCOUNTS) {
+  console.log(`Seeding ${TEST_ACCOUNTS.length} Firebase test accounts...`)
+
+  for (const { email, role, displayName, courtId, councilId } of TEST_ACCOUNTS) {
     try {
       let uid
       try {
@@ -37,23 +66,29 @@ async function run() {
           emailVerified: true,
         })
         uid = userRecord.uid
-        console.log(`Created user: ${email} (${uid})`)
+        console.log(`✓ Created auth user: ${email} (${uid})`)
       } catch (err) {
         if (err.code === 'auth/email-already-exists') {
-          const list = await auth.getUsersByEmail([email])
-          uid = list.users[0].uid
+          const userRecord = await auth.getUserByEmail(email)
+          uid = userRecord.uid
           await auth.updateUser(uid, { password: TEST_PASSWORD })
-          console.log(`User already exists, password reset: ${email} (${uid})`)
+          console.log(`↺ Existing auth user updated (password reset): ${email} (${uid})`)
         } else {
           throw err
         }
       }
 
       await db.collection('users').doc(uid).set(
-        { role, active: true },
+        {
+          role,
+          displayName,
+          active: true,
+          courtId,
+          councilId,
+        },
         { merge: true }
       )
-      console.log(`  → Firestore users/${uid} set role=${role}`)
+      console.log(`  → Firestore users/${uid} updated: role=${role}, courtId=${courtId}, councilId=${councilId}`)
     } catch (err) {
       console.error(`Failed for ${email}:`, err.message)
     }
