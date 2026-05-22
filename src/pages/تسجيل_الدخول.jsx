@@ -168,8 +168,8 @@ export default function تسجيل_الدخول() {
           <div className="login-test-accounts">
             <div className="login-test-accounts-title">حسابات تجريبية للدخول السريع</div>
             <p className="login-test-accounts-note muted">
-              للوصول السريع في العرض التجريبي، اختر أحد الحسابات التالية. كلمة المرور الافتراضية
-              لجميعها هي: <strong>{TEST_PASSWORD}</strong>
+              للوصول السريع في العرض التجريبي، اختر أحد الحسابات التالية. كلمة المرور الافتراضية لجميعها
+              هي: <strong>{TEST_PASSWORD}</strong>
             </p>
             <ul className="login-test-accounts-list">
               {TEST_ACCOUNTS.map((account) => (
