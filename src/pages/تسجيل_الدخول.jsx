@@ -8,17 +8,22 @@ const TEST_ACCOUNTS = [
   {
     email: 'clerk@test.com',
     role: 'أمين الضبط',
-    desc: 'تسجيل القضايا والبحث وإصدار الوثائق',
+    desc: 'إدخال بيانات القضية لأول مرة واستخراج بطاقة المعلومات عند الحاجة',
+  },
+  {
+    email: 'judge@test.com',
+    role: 'قاضٍ',
+    desc: 'الاطلاع والتصرف في الملفات المسندة إليه حصراً',
   },
   {
     email: 'prosecutor@test.com',
-    role: 'عضو النيابة العامة',
-    desc: 'إشراف رقابي على مستوى المحكمة',
+    role: 'وكيل الجمهورية',
+    desc: 'اطلاع رقابي على قضاة المحكمة والتصرف الكامل في ملفاته الخاصة',
   },
   {
     email: 'attorney@test.com',
-    role: 'محام عام',
-    desc: 'إشراف شامل على مستوى المجلس القضائي',
+    role: 'النائب العام',
+    desc: 'اطلاع شامل على قضاة المجلس والتصرف الكامل في ملفاته الخاصة',
   },
 ]
 
@@ -72,7 +77,7 @@ export default function تسجيل_الدخول() {
           <div className="login-hero__features">
             <div className="login-hero__feature">
               <strong>متابعة حسب الدور</strong>
-              <span>القاضي، النيابة العامة، المحامي العام، وأمين الضبط.</span>
+              <span>أمين الضبط، قاضٍ، وكيل الجمهورية، والنائب العام.</span>
             </div>
             <div className="login-hero__feature">
               <strong>تنبيهات الأعمال الحرجة</strong>
@@ -161,9 +166,10 @@ export default function تسجيل_الدخول() {
           </form>
 
           <div className="login-test-accounts">
-            <div className="login-test-accounts-title">حسابات تجريبية</div>
+            <div className="login-test-accounts-title">حسابات تجريبية للدخول السريع</div>
             <p className="login-test-accounts-note muted">
-              كلمة المرور الموحّدة لجميع الحسابات التجريبية: <strong>test123</strong>
+              للوصول السريع في العرض التجريبي، اختر أحد الحسابات التالية. كلمة المرور الافتراضية
+              لجميعها هي: <strong>{TEST_PASSWORD}</strong>
             </p>
             <ul className="login-test-accounts-list">
               {TEST_ACCOUNTS.map((account) => (

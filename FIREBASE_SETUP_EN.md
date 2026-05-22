@@ -64,13 +64,14 @@ The app expects a `users` collection where each document:
 
 - Has the document ID = user UID (from Authentication).
 - Has a `role` field with one of:
-  - `PROSECUTOR`
   - `CLERK`
+  - `JUDGE`
+  - `PUBLIC_PROSECUTOR`
   - `ATTORNEY_GENERAL`
 
 ### Option A: Create test users with the script (recommended)
 
-The project includes a script that creates the three test accounts in Firebase Auth and sets their roles in Firestore (password: `test123`).
+The project includes a script that creates four test accounts in Firebase Auth and sets their profiles in Firestore (password: `test123`).
 
 1. Download your Firebase service account key: **Project settings** → **Service accounts** → **Generate new private key**.
 2. Set the environment variable to the JSON file path:
@@ -82,7 +83,7 @@ The project includes a script that creates the three test accounts in Firebase A
    ```bash
    npm run create-test-users
    ```
-4. The script creates (or resets password for) `clerk@test.com`, `prosecutor@test.com`, `attorney@test.com` with password `test123` and writes their roles to Firestore. You can then log in from the app.
+4. The script creates (or resets password for) `clerk@test.com`, `judge@test.com`, `prosecutor@test.com`, `attorney@test.com` with password `test123` and writes role/profile fields to Firestore (`displayName`, `active`, `courtId`, `councilId`). You can then log in from the app.
 
 ### Option B: Create users manually
 
@@ -92,7 +93,7 @@ The project includes a script that creates the three test accounts in Firebase A
 4. Add a field:
    - **Field**: `role`
    - **Type**: string
-   - **Value**: one of `PROSECUTOR`, `CLERK`, or `ATTORNEY_GENERAL`.
+   - **Value**: one of `CLERK`, `JUDGE`, `PUBLIC_PROSECUTOR`, or `ATTORNEY_GENERAL`.
 5. Save the document.
 6. Repeat to create additional user documents (each with ID = UID from Authentication).
 
@@ -108,7 +109,7 @@ The project includes a script that creates the three test accounts in Firebase A
 4. Copy the **User UID** that appears.
 5. In Firestore, create a new document in the **`users`** collection:
    - Document ID = the same UID.
-   - Field `role` = `CLERK` (or `PROSECUTOR` / `ATTORNEY_GENERAL` depending on the user).
+   - Field `role` = `CLERK` (or `JUDGE` / `PUBLIC_PROSECUTOR` / `ATTORNEY_GENERAL` depending on the user).
 6. You can now log in to the app using this email and password.
 
 ---
@@ -219,8 +220,7 @@ Use that URL to access the app online. Hosting is already set to use the `dist` 
   - Make sure there is a matching document in the `users` collection with the same UID and a valid `role` value.
 
 - **Insufficient permissions in the UI**  
-  - Verify that `role` in the `users/{uid}` document is one of: `PROSECUTOR`, `CLERK`, `ATTORNEY_GENERAL`.
+  - Verify that `role` in the `users/{uid}` document is one of: `CLERK`, `JUDGE`, `PUBLIC_PROSECUTOR`, `ATTORNEY_GENERAL`.
 
 - **Firestore permission errors**  
   - Open the **Rules** tab in Firestore and verify that the deployed rules match the contents of the `firestore.rules` file in this project.  
-
