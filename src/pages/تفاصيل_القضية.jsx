@@ -10,6 +10,7 @@ import {
 import { formatArabicDate, getDaysRemaining } from '../utils/prescription'
 import {
   getCrimeTypeLabel,
+  getStatusDescription,
   getTrackTypeLabel,
   getSeverityLevelLabel,
 } from '../utils/statusHelpers'
@@ -179,7 +180,10 @@ export default function تفاصيل_القضية() {
           <div className="card-body">
             <div className="detail-row">
               <strong>7) حالة التقادم بالألوان:</strong>
-              <شارة_الحالة status={caseData.status} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <شارة_الحالة status={caseData.status} />
+                <span className="muted">{getStatusDescription(caseData.status)}</span>
+              </div>
             </div>
             <div className="detail-row">
               <strong>8) تاريخ البدء:</strong>

@@ -1,3 +1,6 @@
+import dayjs from 'dayjs'
+import { getDaysRemaining } from './prescription'
+
 export const CRIME_TYPE_LABELS = {
   FELONY: 'جناية',
   SIMPLE_MISDEMEANOR: 'جنحة بسيطة',
@@ -36,31 +39,142 @@ export const INTERRUPTION_TYPE_LABELS = {
   TRIAL: 'إجراءات المحاكمة',
 }
 
-export const STATUS_LABELS = {
-  ACTIVE: 'سارية',
-  WARNING: 'تنبيه',
-  URGENT: 'عاجلة',
-  CRITICAL: 'حرجة',
-  EXPIRED: 'منتهية',
-  NON_PRESCRIPTIBLE: 'غير قابلة للتقادم',
+export const STATUS_META = {
+  ACTIVE: {
+    label: 'آمنة',
+    description: 'أكثر من سنة متبقية على انتهاء الأجل',
+    badgeClass: 'status-badge status-badge-active',
+    cardClass: 'status-card status-card-active',
+    tone: 'safe',
+  },
+  WARNING: {
+    label: 'متابعة خلال سنة',
+    description: 'بين 6 أشهر و12 شهراً متبقية على انتهاء الأجل',
+    badgeClass: 'status-badge status-badge-warning',
+    cardClass: 'status-card status-card-warning',
+    tone: 'warning',
+  },
+  CRITICAL: {
+    label: 'حرجة خلال أقل من 6 أشهر',
+    description: 'أقل من 6 أشهر متبقية على انتهاء الأجل',
+    badgeClass: 'status-badge status-badge-critical',
+    cardClass: 'status-card status-card-critical',
+    tone: 'danger',
+  },
+  SUSPENDED: {
+    label: 'موقوفة',
+    description: 'الأجل موقوف مؤقتاً بسبب سبب وقف نشط',
+    badgeClass: 'status-badge status-badge-suspended',
+    cardClass: 'status-card status-card-suspended',
+    tone: 'info',
+  },
+  EXPIRED: {
+    label: 'منتهية',
+    description: 'انقضى أجل التقادم لهذه القضية',
+    badgeClass: 'status-badge status-badge-expired',
+    cardClass: 'status-card status-card-expired',
+    tone: 'neutral',
+  },
+  NON_PRESCRIPTIBLE: {
+    label: 'غير خاضعة للتقادم',
+    description: 'هذا الملف لا يخضع لآجال التقادم',
+    badgeClass: 'status-badge status-badge-non-prescriptible',
+    cardClass: 'status-card status-card-non-prescriptible',
+    tone: 'info',
+  },
 }
 
-export const STATUS_BADGE_CLASS = {
-  ACTIVE: 'status-badge status-badge-active',
-  WARNING: 'status-badge status-badge-warning',
-  URGENT: 'status-badge status-badge-urgent',
-  CRITICAL: 'status-badge status-badge-critical',
-  EXPIRED: 'status-badge status-badge-expired',
-  NON_PRESCRIPTIBLE: 'status-badge status-badge-non-prescriptible',
+const LEGACY_STATUS_ALIASES = {
+  URGENT: 'WARNING',
 }
 
-export const STATUS_CARD_CLASS = {
-  ACTIVE: 'status-card status-card-active',
-  WARNING: 'status-card status-card-warning',
-  URGENT: 'status-card status-card-urgent',
-  CRITICAL: 'status-card status-card-critical',
-  EXPIRED: 'status-card status-card-expired',
-  NON_PRESCRIPTIBLE: 'status-card status-card-non-prescriptible',
+export const STATUS_LABELS = Object.fromEntries(
+  Object.entries(STATUS_META).map(([key, value]) => [key, value.label]),
+)
+
+export const STATUS_BADGE_CLASS = Object.fromEntries(
+  Object.entries(STATUS_META).map(([key, value]) => [key, value.badgeClass]),
+)
+
+export const STATUS_CARD_CLASS = Object.fromEntries(
+  Object.entries(STATUS_META).map(([key, value]) => [key, value.cardClass]),
+)
+
+export const STATUS_ORDER = [
+  'CRITICAL',
+  'WARNING',
+  'ACTIVE',
+  'SUSPENDED',
+  'EXPIRED',
+  'NON_PRESCRIPTIBLE',
+]
+
+STATUS_LABELS.URGENT = STATUS_LABELS.WARNING
+STATUS_BADGE_CLASS.URGENT = STATUS_BADGE_CLASS.WARNING
+STATUS_CARD_CLASS.URGENT = STATUS_CARD_CLASS.WARNING
+
+function toDateValue(value) {
+  if (!value) return null
+  if (typeof value.toDate === 'function') return value.toDate()
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+export function normalizeStatus(value) {
+  if (!value) return value
+  return LEGACY_STATUS_ALIASES[value] ?? value
+}
+
+export function hasActiveSuspension(suspensionHistory = []) {
+  return suspensionHistory.some((entry) => entry && !entry.endDate)
+}
+
+export function getCaseStatus(prescriptionEndDate, suspensionHistory = []) {
+  if (prescriptionEndDate === null) return 'NON_PRESCRIPTIBLE'
+  if (hasActiveSuspension(suspensionHistory)) return 'SUSPENDED'
+
+  const daysRemaining = getDaysRemaining(prescriptionEndDate)
+  if (daysRemaining === null) return 'ACTIVE'
+  if (daysRemaining <= 0) return 'EXPIRED'
+
+  const endDate = toDateValue(prescriptionEndDate)
+  if (!endDate) return 'ACTIVE'
+
+  const today = dayjs().startOf('day')
+  const criticalBoundary = today.add(6, 'month')
+  const warningBoundary = today.add(1, 'year')
+  const end = dayjs(endDate).startOf('day')
+
+  if (end.isBefore(criticalBoundary) || end.isSame(criticalBoundary, 'day')) {
+    return 'CRITICAL'
+  }
+
+  if (end.isBefore(warningBoundary) || end.isSame(warningBoundary, 'day')) {
+    return 'WARNING'
+  }
+
+  return 'ACTIVE'
+}
+
+export function getStatusMeta(value) {
+  const normalized = normalizeStatus(value)
+  return STATUS_META[normalized] ?? null
+}
+
+export function getStatusDescription(value) {
+  return getStatusMeta(value)?.description ?? ''
+}
+
+export function getStatusTone(value) {
+  return getStatusMeta(value)?.tone ?? 'neutral'
+}
+
+export function isPriorityStatus(value) {
+  return ['CRITICAL', 'WARNING'].includes(normalizeStatus(value))
+}
+
+export function isUrgentStatus(value) {
+  return normalizeStatus(value) === 'CRITICAL'
 }
 
 export function getCrimeTypeLabel(value) {
@@ -88,5 +202,6 @@ export function getInterruptionTypeLabel(value) {
 }
 
 export function getStatusLabel(value) {
-  return STATUS_LABELS[value] ?? value
+  const normalized = normalizeStatus(value)
+  return STATUS_LABELS[normalized] ?? normalized ?? value
 }

@@ -1,25 +1,27 @@
 import { useState } from 'react'
 import { NavLink, Route, Routes } from 'react-router-dom'
-// @ts-ignore JSX modules are implemented in JS
+// @ts-expect-error JSX modules are implemented in JS
 import { useAuth } from './context/AuthContext.jsx'
-// @ts-ignore JSX modules are implemented in JS
+// @ts-expect-error JSX modules are implemented in JS
 import تسجيل_الدخول from './pages/تسجيل_الدخول.jsx'
-// @ts-ignore JSX modules are implemented in JS
+// @ts-expect-error JSX modules are implemented in JS
 import لوحة_التحكم from './pages/لوحة_التحكم.jsx'
-// @ts-ignore JSX modules are implemented in JS
+// @ts-expect-error JSX modules are implemented in JS
 import القضايا from './pages/القضايا.jsx'
-// @ts-ignore JSX modules are implemented in JS
+// @ts-expect-error JSX modules are implemented in JS
 import تفاصيل_القضية from './pages/تفاصيل_القضية.jsx'
-// @ts-ignore JSX modules are implemented in JS
+// @ts-expect-error JSX modules are implemented in JS
 import إنشاء_قضية from './pages/إنشاء_قضية.jsx'
-// @ts-ignore JSX modules are implemented in JS
+// @ts-expect-error JSX modules are implemented in JS
 import إدارة_المستخدمين from './pages/إدارة_المستخدمين.jsx'
-// @ts-ignore JSX modules are implemented in JS
+// @ts-expect-error JSX modules are implemented in JS
 import طباعة_القضية from './pages/طباعة_القضية.jsx'
-// @ts-ignore JSX modules are implemented in JS
+// @ts-expect-error JSX modules are implemented in JS
 import مسار_محمي from './components/مسار_محمي.jsx'
-// @ts-ignore JSX modules are implemented in JS
+// @ts-expect-error JSX modules are implemented in JS
 import معلومات_التقادم from './pages/معلومات_التقادم.jsx'
+// @ts-expect-error JSX modules are implemented in JS
+import جرس_التنبيهات from './components/جرس_التنبيهات.jsx'
 
 function App() {
   const { user, logout, role } = useAuth()
@@ -33,17 +35,20 @@ function App() {
         <header className="app-header">
           <div className="app-header-inner">
             <div className="app-header-title">نظام متابعة آجال التقادم</div>
-            <button
-              type="button"
-              className="app-nav-toggle"
-              onClick={() => setNavOpen((o) => !o)}
-              aria-expanded={navOpen}
-              aria-label={navOpen ? 'إغلاق القائمة' : 'فتح القائمة'}
-            >
-              <span className="app-nav-toggle-bar" />
-              <span className="app-nav-toggle-bar" />
-              <span className="app-nav-toggle-bar" />
-            </button>
+            <div className="app-header-actions">
+              <جرس_التنبيهات />
+              <button
+                type="button"
+                className="app-nav-toggle"
+                onClick={() => setNavOpen((o) => !o)}
+                aria-expanded={navOpen}
+                aria-label={navOpen ? 'إغلاق القائمة' : 'فتح القائمة'}
+              >
+                <span className="app-nav-toggle-bar" />
+                <span className="app-nav-toggle-bar" />
+                <span className="app-nav-toggle-bar" />
+              </button>
+            </div>
           </div>
           <nav className={`app-nav ${navOpen ? 'app-nav--open' : ''}`}>
             <NavLink
