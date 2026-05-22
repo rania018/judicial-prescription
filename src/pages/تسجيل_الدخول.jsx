@@ -7,18 +7,18 @@ const TEST_PASSWORD = 'test123'
 const TEST_ACCOUNTS = [
   {
     email: 'clerk@test.com',
-    role: 'كاتب ضبط',
-    desc: 'تسجيل القضايا، البحث، والطباعة التشغيلية',
+    role: 'أمين الضبط',
+    desc: 'تسجيل القضايا والبحث وإصدار الوثائق',
   },
   {
     email: 'prosecutor@test.com',
-    role: 'عضو نيابة',
-    desc: 'متابعة رقابية على مستوى المحكمة',
+    role: 'عضو النيابة العامة',
+    desc: 'إشراف رقابي على مستوى المحكمة',
   },
   {
     email: 'attorney@test.com',
     role: 'محام عام',
-    desc: 'إشراف أوسع على مستوى المجلس القضائي',
+    desc: 'إشراف شامل على مستوى المجلس القضائي',
   },
 ]
 
@@ -46,7 +46,7 @@ export default function تسجيل_الدخول() {
       navigate(from, { replace: true })
     } catch {
       setError('تعذر التحقق من بيانات الدخول. يرجى التأكد من البريد وكلمة المرور ثم إعادة المحاولة.')
-      toast.error('فشل تسجيل الدخول. تحقق من البيانات أو حاول مرة أخرى بعد قليل.')
+      toast.error('فشل تسجيل الدخول. يرجى التحقق من البيانات أو المحاولة مجدداً.')
     } finally {
       setLoading(false)
     }
@@ -65,14 +65,14 @@ export default function تسجيل_الدخول() {
           <span className="login-hero__badge">منصة قضائية داخلية</span>
           <h1 className="login-hero__title">نظام متابعة آجال التقادم</h1>
           <p className="login-hero__text">
-            دخول موحّد للجهات القضائية مع عرض عربي واضح، وتنبيهات مرئية تسهّل متابعة الملفات
-            الحساسة وفق الصلاحيات الممنوحة لكل دور.
+            دخول موحّد للجهات القضائية عبر واجهة عربية واضحة، مع تنبيهات مرئية تُسهّل متابعة
+            الملفات الحساسة وفق الصلاحيات الممنوحة لكل دور.
           </p>
 
           <div className="login-hero__features">
             <div className="login-hero__feature">
               <strong>متابعة حسب الدور</strong>
-              <span>القاضي، النيابة، المحامي العام، وكتابة الضبط.</span>
+              <span>القاضي، النيابة العامة، المحامي العام، وأمين الضبط.</span>
             </div>
             <div className="login-hero__feature">
               <strong>تنبيهات الأعمال الحرجة</strong>
@@ -80,7 +80,7 @@ export default function تسجيل_الدخول() {
             </div>
             <div className="login-hero__feature">
               <strong>تجربة عربية محسّنة</strong>
-              <span>تصميم RTL واضح مع حالات تحميل وخطأ أكثر سلاسة.</span>
+              <span>تصميم RTL واضح مع معالجة سلسة لحالات التحميل والأخطاء.</span>
             </div>
           </div>
         </section>
@@ -94,7 +94,7 @@ export default function تسجيل_الدخول() {
               </p>
             </div>
             {from !== '/' && (
-              <span className="login-return-chip">سيتم إعادتك إلى الصفحة المطلوبة بعد الدخول</span>
+              <span className="login-return-chip">ستُعاد تلقائياً إلى الصفحة المطلوبة فور تسجيل الدخول</span>
             )}
           </div>
 
@@ -161,9 +161,9 @@ export default function تسجيل_الدخول() {
           </form>
 
           <div className="login-test-accounts">
-            <div className="login-test-accounts-title">حسابات اختبار سريعة</div>
+            <div className="login-test-accounts-title">حسابات تجريبية</div>
             <p className="login-test-accounts-note muted">
-              كلمة المرور الافتراضية لجميع الحسابات: <strong>test123</strong>
+              كلمة المرور الموحّدة لجميع الحسابات التجريبية: <strong>test123</strong>
             </p>
             <ul className="login-test-accounts-list">
               {TEST_ACCOUNTS.map((account) => (
