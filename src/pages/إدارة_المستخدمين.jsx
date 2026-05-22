@@ -1,13 +1,7 @@
 import { useEffect, useState } from 'react'
-import { listUsers, updateUserRoleAndActive } from '../services/userService'
+import { AVAILABLE_ROLES, listUsers, updateUserRoleAndActive } from '../services/userService'
 // @ts-ignore JSX module implemented in JS
 import { useToast } from '../context/ToastContext.jsx'
-
-const ROLES = [
-  { value: 'CLERK', label: 'كاتب ضبط' },
-  { value: 'PROSECUTOR', label: 'عضو نيابة' },
-  { value: 'ATTORNEY_GENERAL', label: 'محام عام' },
-]
 
 export default function إدارة_المستخدمين() {
   const [users, setUsers] = useState([])
@@ -148,7 +142,7 @@ export default function إدارة_المستخدمين() {
                         <option value="" disabled>
                           اختر الدور
                         </option>
-                        {ROLES.map((r) => (
+                        {AVAILABLE_ROLES.map((r) => (
                           <option key={r.value} value={r.value}>
                             {r.label}
                           </option>
@@ -182,4 +176,3 @@ export default function إدارة_المستخدمين() {
     </div>
   )
 }
-

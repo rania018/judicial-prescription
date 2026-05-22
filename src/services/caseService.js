@@ -11,17 +11,70 @@ import {
   where,
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
-import { calculatePrescription } from '../utils/prescription'
+import { calculatePrescription, getDaysRemaining } from '../utils/prescription'
+import {
+  canPerformInterruptionType,
+  canTakeJudicialActions,
+  getCaseAccessLevel,
+  normalizeRole,
+} from '../utils/rbacHelper'
 import { addAuditLog } from './auditService'
 
 const CASES_COLLECTION = 'cases'
 
-export async function createCase(baseData, userId) {
-  // Prepare data for calculation
-  const { 
-    prescriptionStartDate, 
-    prescriptionEndDate 
-  } = calculatePrescription({
+function normalizeCaseRecord(data) {
+  if (!data) return data
+  const caseReference = data.caseReference || data.caseCode || ''
+  return {
+    ...data,
+    caseReference,
+  }
+}
+
+function computeStatusFromEndDate(prescriptionEndDate) {
+  if (prescriptionEndDate === null) return 'NON_PRESCRIPTIBLE'
+
+  const daysRemaining = getDaysRemaining(prescriptionEndDate)
+  if (daysRemaining === null) return 'ACTIVE'
+  if (daysRemaining <= 0) return 'EXPIRED'
+  if (daysRemaining <= 7) return 'CRITICAL'
+  if (daysRemaining <= 15) return 'URGENT'
+  if (daysRemaining <= 90) return 'WARNING'
+  return 'ACTIVE'
+}
+
+function toDate(value) {
+  if (!value) return null
+  if (typeof value.toDate === 'function') return value.toDate()
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function assertJudicialEditAllowed({ userRole, userId, caseData }) {
+  const accessLevel = getCaseAccessLevel({ userId, userRole, caseData })
+  if (!canTakeJudicialActions(userRole, accessLevel)) {
+    throw new Error('لا تملك صلاحية اتخاذ إجراءات قضائية على هذه القضية.')
+  }
+}
+
+function assertActionDateNotFuture(actionDate) {
+  const date = toDate(actionDate)
+  if (!date) {
+    throw new Error('تاريخ الإجراء غير صالح.')
+  }
+
+  const today = new Date()
+  today.setHours(23, 59, 59, 999)
+  if (date > today) {
+    throw new Error('لا يمكن اختيار تاريخ مستقبلي للإجراء.')
+  }
+}
+
+export async function createCase(baseData, userId, userContext = {}) {
+  const normalizedRole = normalizeRole(userContext.role)
+  const assignedTo = baseData.assignedTo || userId
+
+  const { prescriptionStartDate, prescriptionEndDate } = calculatePrescription({
     trackType: baseData.trackType,
     crimeType: baseData.crimeType,
     crimeDate: baseData.crimeDate,
@@ -32,22 +85,8 @@ export async function createCase(baseData, userId) {
     minorBirthDate: baseData.minorBirthDate || null,
   })
 
-  // Determine status based on remaining days
-  let status = 'ACTIVE'
-  if (prescriptionEndDate === null) {
-    status = 'NON_PRESCRIPTIBLE' // Non-expiring case
-  } else {
-    const { getDaysRemaining } = await import('../utils/prescription')
-    const daysRemaining = getDaysRemaining(prescriptionEndDate)
-    
-    if (daysRemaining <= 0) status = 'EXPIRED'
-    else if (daysRemaining <= 7) status = 'CRITICAL'
-    else if (daysRemaining <= 15) status = 'URGENT'
-    else if (daysRemaining <= 90) status = 'WARNING'
-  }
-
   const payload = {
-    caseReference: baseData.caseReference,
+    caseReference: (baseData.caseReference || '').trim(),
     trackType: baseData.trackType,
     crimeType: baseData.crimeType,
     severityLevel: baseData.severityLevel,
@@ -59,8 +98,12 @@ export async function createCase(baseData, userId) {
     minorBirthDate: baseData.minorBirthDate || null,
     prescriptionStartDate,
     prescriptionEndDate,
-    status,
+    status: computeStatusFromEndDate(prescriptionEndDate),
+    assignedTo,
     createdBy: userId,
+    createdByRole: normalizedRole || null,
+    courtId: baseData.courtId || userContext.courtId || null,
+    councilId: baseData.councilId || userContext.councilId || null,
     createdAt: serverTimestamp(),
     interruptionHistory: [],
     suspensionHistory: [],
@@ -73,63 +116,158 @@ export async function createCase(baseData, userId) {
     userId,
     details: {
       caseId: ref.id,
-      caseReference: baseData.caseReference,
+      caseReference: payload.caseReference,
       crimeType: baseData.crimeType,
+      assignedTo,
     },
   })
-  return { id: ref.id, ...snapshot.data() }
+  return { id: ref.id, ...normalizeCaseRecord(snapshot.data()) }
 }
 
-export async function listCases({ status, caseReference, crimeType }) {
+export async function listCases({
+  status,
+  caseReference,
+  caseCode,
+  crimeType,
+  userId,
+  userRole,
+  userContext,
+}) {
   const colRef = collection(db, CASES_COLLECTION)
-  const constraints = []
+  const baseConstraints = []
 
   if (status && status !== 'ALL') {
-    constraints.push(where('status', '==', status))
+    baseConstraints.push(where('status', '==', status))
   }
 
-  if (caseReference && caseReference.trim().length > 0) {
-    constraints.push(where('caseReference', '==', caseReference.trim()))
-  }
-
+  const normalizedReference = (caseReference || caseCode || '').trim()
+  const hasReferenceFilter = normalizedReference.length > 0
   if (crimeType && crimeType !== 'ALL') {
-    constraints.push(where('crimeType', '==', crimeType))
+    baseConstraints.push(where('crimeType', '==', crimeType))
   }
 
-  const q = constraints.length
-    ? query(colRef, ...constraints, orderBy('prescriptionEndDate', 'asc'))
+  const referenceConstraints = hasReferenceFilter
+    ? [...baseConstraints, where('caseReference', '==', normalizedReference)]
+    : baseConstraints
+
+  const q = referenceConstraints.length
+    ? query(colRef, ...referenceConstraints, orderBy('prescriptionEndDate', 'asc'))
     : query(colRef, orderBy('prescriptionEndDate', 'asc'))
 
-  const snapshot = await getDocs(q)
-  return snapshot.docs.map((docSnap) => ({
-    id: docSnap.id,
-    ...docSnap.data(),
-  }))
+  let docs = (await getDocs(q)).docs
+  if (hasReferenceFilter && docs.length === 0) {
+    const legacyConstraints = [...baseConstraints, where('caseCode', '==', normalizedReference)]
+    const legacyQuery = query(colRef, ...legacyConstraints, orderBy('prescriptionEndDate', 'asc'))
+    docs = (await getDocs(legacyQuery)).docs
+  }
+
+  return docs
+    .map((docSnap) => {
+      const data = normalizeCaseRecord(docSnap.data())
+      const accessLevel = getCaseAccessLevel({
+        userId,
+        userRole,
+        userContext,
+        caseData: data,
+      })
+      return {
+        id: docSnap.id,
+        ...data,
+        accessLevel,
+        isEditable: accessLevel === 'edit',
+      }
+    })
+    .filter((caseData) => caseData.accessLevel !== 'none')
 }
 
-export async function getCaseById(caseId) {
+export async function getCaseById(caseId, accessOptions = {}) {
   const ref = doc(db, CASES_COLLECTION, caseId)
   const snapshot = await getDoc(ref)
   if (!snapshot.exists()) {
     return null
   }
-  return { id: snapshot.id, ...snapshot.data() }
+
+  const data = normalizeCaseRecord(snapshot.data())
+  const accessLevel = getCaseAccessLevel({
+    userId: accessOptions.userId,
+    userRole: accessOptions.userRole,
+    userContext: accessOptions.userContext,
+    caseData: data,
+  })
+
+  if (accessOptions.userId && accessLevel === 'none') {
+    return null
+  }
+
+  return {
+    id: snapshot.id,
+    ...data,
+    accessLevel,
+    isEditable: accessLevel === 'edit',
+  }
 }
 
 export async function listCaseActions(caseId) {
-  const actionsRef = collection(db, CASES_COLLECTION, caseId, 'interruptions')
-  const q = query(actionsRef, orderBy('actionDate', 'desc'))
-  const snapshot = await getDocs(q)
-  return snapshot.docs.map((docSnap) => ({
-    id: docSnap.id,
-    ...docSnap.data(),
+  const caseData = await getCaseById(caseId)
+  if (!caseData) return []
+
+  const interruptions = (caseData.interruptionHistory || []).map((entry) => ({
+    id: `interrupt-${entry.id || entry.date}`,
+    actionDate: entry.date,
+    kind: 'INTERRUPTION',
+    actionType: entry.type,
+    notes: entry.notes,
+    performedBy: entry.performedBy,
   }))
+
+  const suspensions = (caseData.suspensionHistory || []).flatMap((entry) => {
+    const startEntry = {
+      id: `suspend-start-${entry.id || entry.startDate}`,
+      actionDate: entry.startDate,
+      kind: 'SUSPENSION_START',
+      suspensionReason: entry.reason,
+      notes: entry.notes,
+      performedBy: entry.suspendedBy,
+    }
+
+    if (!entry.endDate) {
+      return [startEntry]
+    }
+
+    const resumeEntry = {
+      id: `suspend-resume-${entry.id || entry.endDate}`,
+      actionDate: entry.endDate,
+      kind: 'SUSPENSION_RESUME',
+      notes: 'تفعيل الأجل بعد زوال سبب الوقف',
+      performedBy: entry.resumedBy,
+    }
+
+    return [startEntry, resumeEntry]
+  })
+
+  return [...interruptions, ...suspensions].sort((a, b) => {
+    const aDate = toDate(a.actionDate)?.getTime() || 0
+    const bDate = toDate(b.actionDate)?.getTime() || 0
+    return bDate - aDate
+  })
 }
 
-export async function addCaseInterruption(caseId, baseInterruption, userId, caseData) {
+export async function addCaseInterruption(
+  caseId,
+  baseInterruption,
+  userId,
+  userRole,
+  caseData,
+) {
   if (caseData.status === 'EXPIRED' || caseData.status === 'NON_PRESCRIPTIBLE') {
-    throw new Error('لا يمكن تعديل حالة تقادم قضية منتهية أو مستثناة.');
+    throw new Error('لا يمكن تعديل حالة تقادم قضية منتهية أو مستثناة.')
   }
+
+  assertJudicialEditAllowed({ userRole, userId, caseData })
+  if (!canPerformInterruptionType(userRole, baseInterruption.actionType)) {
+    throw new Error('نوع إجراء الانقطاع غير مسموح لهذا الدور.')
+  }
+  assertActionDateNotFuture(baseInterruption.actionDate)
 
   const interruptionsRef = collection(db, CASES_COLLECTION, caseId, 'interruptions')
   const payload = {
@@ -151,7 +289,6 @@ export async function addCaseInterruption(caseId, baseInterruption, userId, case
     },
   })
 
-  // Update the case's interruption history
   const updatedInterruptionHistory = [
     ...(caseData.interruptionHistory || []),
     {
@@ -160,14 +297,10 @@ export async function addCaseInterruption(caseId, baseInterruption, userId, case
       date: baseInterruption.actionDate,
       performedBy: userId,
       notes: baseInterruption.notes,
-    }
+    },
   ]
 
-  // Recalculate prescription dates due to interruption
-  const { 
-    prescriptionStartDate, 
-    prescriptionEndDate 
-  } = calculatePrescription({
+  const { prescriptionStartDate, prescriptionEndDate } = calculatePrescription({
     trackType: caseData.trackType,
     crimeType: caseData.crimeType,
     crimeDate: caseData.crimeDate,
@@ -180,36 +313,42 @@ export async function addCaseInterruption(caseId, baseInterruption, userId, case
     suspensionHistory: caseData.suspensionHistory,
   })
 
-  // Determine new status
-  let newStatus = 'ACTIVE'
-  if (prescriptionEndDate === null) {
-    newStatus = 'NON_PRESCRIPTIBLE'
-  } else {
-    const { getDaysRemaining } = await import('../utils/prescription')
-    const daysRemaining = getDaysRemaining(prescriptionEndDate)
-    
-    if (daysRemaining <= 0) newStatus = 'EXPIRED'
-    else if (daysRemaining <= 7) newStatus = 'CRITICAL'
-    else if (daysRemaining <= 15) newStatus = 'URGENT'
-    else if (daysRemaining <= 90) newStatus = 'WARNING'
-  }
-
   await updateDoc(doc(db, CASES_COLLECTION, caseId), {
     interruptionHistory: updatedInterruptionHistory,
     prescriptionStartDate,
     prescriptionEndDate,
-    status: newStatus,
+    status: computeStatusFromEndDate(prescriptionEndDate),
   })
 }
 
-export async function addCaseSuspension(caseId, suspensionData, userId, caseData) {
+export async function addCaseSuspension(
+  caseId,
+  suspensionData,
+  userId,
+  userRole,
+  caseData,
+) {
   if (caseData.status === 'EXPIRED' || caseData.status === 'NON_PRESCRIPTIBLE') {
-    throw new Error('لا يمكن تعديل حالة تقادم قضية منتهية أو مستثناة.');
+    throw new Error('لا يمكن تعديل حالة تقادم قضية منتهية أو مستثناة.')
+  }
+
+  assertJudicialEditAllowed({ userRole, userId, caseData })
+  assertActionDateNotFuture(suspensionData.actionDate)
+
+  const hasActiveSuspension = (caseData.suspensionHistory || []).some((s) => !s.endDate)
+  if (hasActiveSuspension) {
+    throw new Error('لا يمكن إضافة وقف جديد قبل تفعيل الأجل للوقف النشط.')
+  }
+
+  const reason = (suspensionData.suspensionReason || '').trim()
+  if (!reason) {
+    throw new Error('سبب الوقف مطلوب.')
   }
 
   const suspensionsRef = collection(db, CASES_COLLECTION, caseId, 'suspensions')
   const payload = {
     ...suspensionData,
+    suspensionReason: reason,
     suspendedBy: userId,
     createdAt: serverTimestamp(),
   }
@@ -222,28 +361,23 @@ export async function addCaseSuspension(caseId, suspensionData, userId, caseData
       caseId,
       caseReference: caseData.caseReference,
       suspensionId: suspensionRef.id,
-      suspensionReason: suspensionData.suspensionReason,
+      suspensionReason: reason,
       startDate: suspensionData.actionDate,
     },
   })
 
-  // Update the case's suspension history
   const updatedSuspensionHistory = [
     ...(caseData.suspensionHistory || []),
     {
       id: suspensionRef.id,
       startDate: suspensionData.actionDate,
-      reason: suspensionData.suspensionReason,
+      reason,
       suspendedBy: userId,
       notes: suspensionData.notes,
-    }
+    },
   ]
 
-  // Recalculate prescription dates due to suspension
-  const { 
-    prescriptionStartDate, 
-    prescriptionEndDate 
-  } = calculatePrescription({
+  const { prescriptionStartDate, prescriptionEndDate } = calculatePrescription({
     trackType: caseData.trackType,
     crimeType: caseData.crimeType,
     crimeDate: caseData.crimeDate,
@@ -256,49 +390,47 @@ export async function addCaseSuspension(caseId, suspensionData, userId, caseData
     suspensionHistory: updatedSuspensionHistory,
   })
 
-  // Determine new status
-  let newStatus = 'ACTIVE'
-  if (prescriptionEndDate === null) {
-    newStatus = 'NON_PRESCRIPTIBLE'
-  } else {
-    const { getDaysRemaining } = await import('../utils/prescription')
-    const daysRemaining = getDaysRemaining(prescriptionEndDate)
-    
-    if (daysRemaining <= 0) newStatus = 'EXPIRED'
-    else if (daysRemaining <= 7) newStatus = 'CRITICAL'
-    else if (daysRemaining <= 15) newStatus = 'URGENT'
-    else if (daysRemaining <= 90) newStatus = 'WARNING'
-  }
-
   await updateDoc(doc(db, CASES_COLLECTION, caseId), {
     suspensionHistory: updatedSuspensionHistory,
     prescriptionStartDate,
     prescriptionEndDate,
-    status: newStatus,
+    status: computeStatusFromEndDate(prescriptionEndDate),
   })
 }
 
-export async function resumeCaseFromSuspension(caseId, resumeData, userId, caseData) {
+export async function resumeCaseFromSuspension(
+  caseId,
+  resumeData,
+  userId,
+  userRole,
+  caseData,
+) {
   if (caseData.status === 'EXPIRED' || caseData.status === 'NON_PRESCRIPTIBLE') {
-    throw new Error('لا يمكن تعديل حالة تقادم قضية منتهية أو مستثناة.');
+    throw new Error('لا يمكن تعديل حالة تقادم قضية منتهية أو مستثناة.')
   }
 
-  // Find the active suspension (without endDate) to update
-  const activeSuspension = caseData.suspensionHistory.find(s => !s.endDate)
+  assertJudicialEditAllowed({ userRole, userId, caseData })
+  assertActionDateNotFuture(resumeData.actionDate)
+
+  const activeSuspension = (caseData.suspensionHistory || []).find((s) => !s.endDate)
   if (!activeSuspension) {
     throw new Error('لا توجد حالة وقف نشطة لهذه القضية.')
   }
 
-  // Update the suspension record with end date
+  const resumeDate = toDate(resumeData.actionDate)
+  const suspensionStartDate = toDate(activeSuspension.startDate)
+  if (resumeDate && suspensionStartDate && resumeDate < suspensionStartDate) {
+    throw new Error('تاريخ التفعيل يجب أن يكون بعد تاريخ بدء الوقف.')
+  }
+
   const suspensionRef = doc(db, CASES_COLLECTION, caseId, 'suspensions', activeSuspension.id)
   await updateDoc(suspensionRef, {
     endDate: resumeData.actionDate,
     resumedBy: userId,
   })
 
-  // Update the local suspension history
   const updatedSuspensionHistory = [...(caseData.suspensionHistory || [])]
-  const idx = updatedSuspensionHistory.findIndex(s => s.id === activeSuspension.id)
+  const idx = updatedSuspensionHistory.findIndex((s) => s.id === activeSuspension.id)
   if (idx !== -1) {
     updatedSuspensionHistory[idx] = {
       ...updatedSuspensionHistory[idx],
@@ -307,11 +439,7 @@ export async function resumeCaseFromSuspension(caseId, resumeData, userId, caseD
     }
   }
 
-  // Recalculate prescription dates
-  const { 
-    prescriptionStartDate, 
-    prescriptionEndDate 
-  } = calculatePrescription({
+  const { prescriptionStartDate, prescriptionEndDate } = calculatePrescription({
     trackType: caseData.trackType,
     crimeType: caseData.crimeType,
     crimeDate: caseData.crimeDate,
@@ -324,25 +452,11 @@ export async function resumeCaseFromSuspension(caseId, resumeData, userId, caseD
     suspensionHistory: updatedSuspensionHistory,
   })
 
-  // Determine new status
-  let newStatus = 'ACTIVE'
-  if (prescriptionEndDate === null) {
-    newStatus = 'NON_PRESCRIPTIBLE'
-  } else {
-    const { getDaysRemaining } = await import('../utils/prescription')
-    const daysRemaining = getDaysRemaining(prescriptionEndDate)
-    
-    if (daysRemaining <= 0) newStatus = 'EXPIRED'
-    else if (daysRemaining <= 7) newStatus = 'CRITICAL'
-    else if (daysRemaining <= 15) newStatus = 'URGENT'
-    else if (daysRemaining <= 90) newStatus = 'WARNING'
-  }
-
   await updateDoc(doc(db, CASES_COLLECTION, caseId), {
     suspensionHistory: updatedSuspensionHistory,
     prescriptionStartDate,
     prescriptionEndDate,
-    status: newStatus,
+    status: computeStatusFromEndDate(prescriptionEndDate),
   })
 
   await addAuditLog({

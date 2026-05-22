@@ -9,7 +9,7 @@ import { useToast } from '../context/ToastContext.jsx'
 import نموذج_قضية from '../components/نموذج_قضية.jsx'
 
 export default function إنشاء_قضية() {
-  const { user } = useAuth()
+  const { user, role, userProfile } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
   const [submitting, setSubmitting] = useState(false)
@@ -20,8 +20,12 @@ export default function إنشاء_قضية() {
     setError('')
     setSubmitting(true)
     try {
-      const created = await createCase(baseData, user.uid)
-      toast.success(`تم تسجيل القضية رقم ${baseData.caseCode} بنجاح.`)
+      const created = await createCase(baseData, user.uid, {
+        role,
+        courtId: userProfile?.courtId,
+        councilId: userProfile?.councilId,
+      })
+      toast.success(`تم تسجيل القضية رقم ${baseData.caseReference} بنجاح.`)
       navigate(`/القضايا/${created.id}`)
     } catch (err) {
       // إظهار رسالة الخطأ الفعلية للمساعدة في التشخيص
@@ -67,4 +71,3 @@ export default function إنشاء_قضية() {
     </div>
   )
 }
-

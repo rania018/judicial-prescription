@@ -19,11 +19,17 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 
 const STATUS_KEYS = ['ACTIVE', 'WARNING', 'URGENT', 'CRITICAL', 'EXPIRED']
-const CRIME_TYPES = ['FELONY', 'MISDEMEANOR', 'VIOLATION']
+const CRIME_TYPES = [
+  'FELONY',
+  'SIMPLE_MISDEMEANOR',
+  'AGGRAVATED_MISDEMEANOR',
+  'VIOLATION',
+  'EXEMPTED',
+]
 const EXPIRING_DAYS = 7
 
 export default function لوحة_التحكم() {
-  const { role } = useAuth()
+  const { user, role, userProfile } = useAuth()
   const [counts, setCounts] = useState({
     ACTIVE: 0,
     WARNING: 0,
@@ -42,7 +48,11 @@ export default function لوحة_التحكم() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const cases = await listCases({})
+      const cases = await listCases({
+        userId: user?.uid,
+        userRole: role,
+        userContext: userProfile,
+      })
       setAllCases(cases)
       const nextCounts = { ACTIVE: 0, WARNING: 0, URGENT: 0, CRITICAL: 0, EXPIRED: 0 }
       STATUS_KEYS.forEach((key) => {
@@ -53,7 +63,7 @@ export default function لوحة_التحكم() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [role, user?.uid, userProfile])
 
   useEffect(() => {
     load()
@@ -291,7 +301,7 @@ export default function لوحة_التحكم() {
                         <tbody>
                           {expiringSoon.map((c) => (
                             <tr key={c.id}>
-                              <td>{c.caseCode}</td>
+                              <td>{c.caseReference}</td>
                               <td>{formatArabicDate(c.prescriptionEndDate)}</td>
                               <td>
                                 <span
@@ -345,7 +355,7 @@ export default function لوحة_التحكم() {
                         <tbody>
                           {attentionCases.slice(0, 10).map((c) => (
                             <tr key={c.id}>
-                              <td>{c.caseCode}</td>
+                              <td>{c.caseReference}</td>
                               <td>{formatArabicDate(c.prescriptionEndDate)}</td>
                               <td>
                                 <شارة_الحالة status={c.status} />

@@ -35,7 +35,7 @@ export async function updateUserRoleAndActive(id, { role, active }) {
 // Export available roles for use in UI
 export const AVAILABLE_ROLES = [
   { value: 'CLERK', label: 'أمين الضبط' },
-  { value: 'INVESTIGATING_JUDGE', label: 'قاضي التحقيق' },
-  { value: 'PROSECUTOR', label: 'النيابة العامة' },
+  { value: 'JUDGE', label: 'قاضٍ' },
+  { value: 'PUBLIC_PROSECUTOR', label: 'وكيل الجمهورية' },
   { value: 'ATTORNEY_GENERAL', label: 'المحامي العام' },
 ]

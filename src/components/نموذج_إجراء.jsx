@@ -23,7 +23,7 @@ export default function نموذج_إجراء({ onSubmit, submitting, disabled, 
   
   const isValid = isInterruptionMode 
     ? actionType && actionDate !== '' 
-    : actionDate !== '' && suspensionReason.trim() !== ''
+    : actionDate !== '' && suspensionReason.trim().length >= 5
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -79,18 +79,18 @@ export default function نموذج_إجراء({ onSubmit, submitting, disabled, 
         {!isInterruptionMode && (
           <div className="form-field">
             <label className="form-label" htmlFor="suspensionReason">
-              سبب الوقف
+              سبب الوقف وتفاصيله
             </label>
-            <input
+            <textarea
               id="suspensionReason"
-              type="text"
-              className="form-input"
+              className="form-textarea"
               value={suspensionReason}
               onChange={(e) => setSuspensionReason(e.target.value)}
               required
               disabled={disabled}
+              rows="3"
             />
-            <p className="muted">سبب وقف التقادم مؤقتًا.</p>
+            <p className="muted">اكتب السبب القانوني/المادي للوقف (5 أحرف على الأقل).</p>
           </div>
         )}
 
@@ -141,7 +141,7 @@ export default function نموذج_إجراء({ onSubmit, submitting, disabled, 
               </span>
             </>
           ) : (
-            isInterruptionMode ? 'إضافة إجراء (انقطاع)' : 'تسجيل وقف (Suspension)'
+            isInterruptionMode ? 'إضافة إجراء (انقطاع)' : 'تسجيل وقف'
           )}
         </button>
       </div>

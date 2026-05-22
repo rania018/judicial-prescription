@@ -6,12 +6,14 @@ import {
 } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
 import { auth, db } from '../firebase/config'
+import { normalizeRole } from '../utils/rbacHelper'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [role, setRole] = useState(null)
+  const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -19,6 +21,7 @@ export function AuthProvider({ children }) {
       if (!firebaseUser) {
         setUser(null)
         setRole(null)
+        setUserProfile(null)
         setLoading(false)
         return
       }
@@ -28,13 +31,16 @@ export function AuthProvider({ children }) {
         const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid))
         if (userDoc.exists()) {
           const data = userDoc.data()
-          setRole(data.role ?? null)
+          setRole(normalizeRole(data.role ?? null))
+          setUserProfile(data)
         } else {
           setRole(null)
+          setUserProfile(null)
         }
       } catch (error) {
         // يمكن إضافة تسجيل للأخطاء عند الحاجة
         setRole(null)
+        setUserProfile(null)
       } finally {
         setLoading(false)
       }
@@ -54,6 +60,7 @@ export function AuthProvider({ children }) {
   const value = {
     user,
     role,
+    userProfile,
     loading,
     login,
     logout,
@@ -69,4 +76,3 @@ export function useAuth() {
   }
   return context
 }
-

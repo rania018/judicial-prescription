@@ -1,100 +1,134 @@
 /**
- * Role-based access control helper for the criminal case statute of limitations management platform
+ * Role-based access helpers for case visibility and actions.
  */
 
-// Define user roles
 export const ROLES = {
-  CLERK: 'CLERK',               // أمين الضبط
-  INVESTIGATING_JUDGE: 'INVESTIGATING_JUDGE', // قاضي التحقيق
-  PROSECUTOR: 'PROSECUTOR',     // النيابة العامة
-  ATTORNEY_GENERAL: 'ATTORNEY_GENERAL', // المحامي العام
+  CLERK: 'CLERK',
+  JUDGE: 'JUDGE',
+  PUBLIC_PROSECUTOR: 'PUBLIC_PROSECUTOR',
+  ATTORNEY_GENERAL: 'ATTORNEY_GENERAL',
 }
 
-// Define permissions for each role
+const ROLE_ALIASES = {
+  INVESTIGATING_JUDGE: ROLES.JUDGE,
+  PROSECUTOR: ROLES.PUBLIC_PROSECUTOR,
+}
+
+export function normalizeRole(role) {
+  if (!role) return null
+  return ROLE_ALIASES[role] || role
+}
+
 export const PERMISSIONS = {
-  // Clerk: Create file, view data. NO access to انقطاع/وقف buttons.
   [ROLES.CLERK]: {
     canCreateCase: true,
-    canViewData: true,
-    canAddInterruption: false, // NO interruption access
-    canAddSuspension: false,   // NO suspension access
-    canResumeSuspension: false,
-    canViewInterruptions: true,
-    canViewSuspensions: true,
+    canViewCase: true,
+    canEditOwnCase: false,
+    canTakeJudicialAction: false,
   },
-  
-  // Investigating Judge: Can ONLY trigger انقطاع type 3 (إجراءات التحقيق القضائي) on assigned files.
-  [ROLES.INVESTIGATING_JUDGE]: {
-    canCreateCase: false, // Judges typically don't create cases
-    canViewData: true,
-    canAddInterruption: true,
-    allowedInterruptionTypes: ['JUDICIAL_INVESTIGATION'], // Only judicial investigation
-    canAddSuspension: false,
-    canResumeSuspension: false,
-    canViewInterruptions: true,
-    canViewSuspensions: true,
+  [ROLES.JUDGE]: {
+    canCreateCase: false,
+    canViewCase: true,
+    canEditOwnCase: true,
+    canTakeJudicialAction: true,
   },
-  
-  // Prosecutor: Full access: create, view, suspend, trigger all 4 انقطاع types.
-  [ROLES.PROSECUTOR]: {
-    canCreateCase: true,
-    canViewData: true,
-    canAddInterruption: true,
-    allowedInterruptionTypes: ['INVESTIGATION', 'PROSECUTION', 'JUDICIAL_INVESTIGATION', 'TRIAL'],
-    canAddSuspension: true,
-    canResumeSuspension: true,
-    canViewInterruptions: true,
-    canViewSuspensions: true,
+  [ROLES.PUBLIC_PROSECUTOR]: {
+    canCreateCase: false,
+    canViewCase: true,
+    canEditOwnCase: true,
+    canTakeJudicialAction: true,
+    canSupervise: true,
+    supervisoryScopeField: 'courtId',
   },
-  
-  // Attorney General: Administrative access
   [ROLES.ATTORNEY_GENERAL]: {
-    canCreateCase: false, // Usually admins don't create cases
-    canViewData: true,
-    canAddInterruption: true,
-    allowedInterruptionTypes: ['INVESTIGATION', 'PROSECUTION', 'JUDICIAL_INVESTIGATION', 'TRIAL'],
-    canAddSuspension: true,
-    canResumeSuspension: true,
-    canViewInterruptions: true,
-    canViewSuspensions: true,
+    canCreateCase: false,
+    canViewCase: true,
+    canEditOwnCase: true,
+    canTakeJudicialAction: true,
+    canSupervise: true,
     canManageUsers: true,
+    supervisoryScopeField: 'councilId',
   },
 }
 
-// Helper function to check if a user has a specific permission
+const INTERRUPTION_TYPES = [
+  'INVESTIGATION',
+  'PROSECUTION',
+  'JUDICIAL_INVESTIGATION',
+  'TRIAL',
+]
+
 export function hasPermission(userRole, permission) {
-  if (!PERMISSIONS[userRole]) {
-    return false;
-  }
-  
-  return Boolean(PERMISSIONS[userRole][permission]);
+  const normalizedRole = normalizeRole(userRole)
+  if (!normalizedRole || !PERMISSIONS[normalizedRole]) return false
+  return Boolean(PERMISSIONS[normalizedRole][permission])
 }
 
-// Helper function to check if a user can perform a specific interruption type
+function getCaseOwnerId(caseData) {
+  return caseData?.assignedTo || caseData?.createdBy || null
+}
+
+function isCaseInSupervisoryScope(caseData, userContext, normalizedRole) {
+  const scopeField = PERMISSIONS[normalizedRole]?.supervisoryScopeField
+  if (!scopeField) return true
+  const caseScope = caseData?.[scopeField]
+  const userScope = userContext?.[scopeField]
+
+  if (!caseScope || !userScope) {
+    // Backward compatibility with pre-scope records.
+    return true
+  }
+
+  return caseScope === userScope
+}
+
+export function getCaseAccessLevel({ userId, userRole, caseData, userContext }) {
+  const normalizedRole = normalizeRole(userRole)
+  if (!normalizedRole || !caseData || !userId) return 'none'
+
+  if (!hasPermission(normalizedRole, 'canViewCase')) {
+    return 'none'
+  }
+
+  const ownerId = getCaseOwnerId(caseData)
+  const isOwner = ownerId === userId
+
+  if (normalizedRole === ROLES.CLERK) {
+    return 'read'
+  }
+
+  if (normalizedRole === ROLES.JUDGE) {
+    return isOwner ? 'edit' : 'none'
+  }
+
+  if (normalizedRole === ROLES.PUBLIC_PROSECUTOR || normalizedRole === ROLES.ATTORNEY_GENERAL) {
+    if (!isCaseInSupervisoryScope(caseData, userContext, normalizedRole)) {
+      return 'none'
+    }
+    return isOwner ? 'edit' : 'read'
+  }
+
+  return isOwner ? 'edit' : 'none'
+}
+
 export function canPerformInterruptionType(userRole, interruptionType) {
-  if (!hasPermission(userRole, 'canAddInterruption')) {
-    return false;
+  const normalizedRole = normalizeRole(userRole)
+  if (!hasPermission(normalizedRole, 'canTakeJudicialAction')) {
+    return false
   }
-  
-  const allowedTypes = PERMISSIONS[userRole].allowedInterruptionTypes;
-  if (!allowedTypes) {
-    // If no specific types defined, allow all types that user has general permission for
-    return true;
-  }
-  
-  return allowedTypes.includes(interruptionType);
+  return INTERRUPTION_TYPES.includes(interruptionType)
 }
 
-// Helper function to get allowed interruption types for a role
 export function getAllowedInterruptionTypes(userRole) {
-  if (!hasPermission(userRole, 'canAddInterruption')) {
-    return [];
+  const normalizedRole = normalizeRole(userRole)
+  if (!hasPermission(normalizedRole, 'canTakeJudicialAction')) {
+    return []
   }
-  
-  return PERMISSIONS[userRole].allowedInterruptionTypes || [];
+  return INTERRUPTION_TYPES
 }
 
-// Helper function to check user role
-export function isRole(userRole, expectedRole) {
-  return userRole === expectedRole;
+export function canTakeJudicialActions(userRole, accessLevel) {
+  const normalizedRole = normalizeRole(userRole)
+  if (accessLevel !== 'edit') return false
+  return hasPermission(normalizedRole, 'canTakeJudicialAction')
 }
