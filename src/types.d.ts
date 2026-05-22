@@ -8,7 +8,7 @@ interface CaseData {
   judicialAuthority: string;       // الجهة القضائية
   judicialOfficer: string;         // الصفة القضائية
   crimeDate: Date;                 // تاريخ اقتراف الجريمة
-  status: 'ACTIVE' | 'WARNING' | 'URGENT' | 'CRITICAL' | 'EXPIRED' | 'NON_PRESCRIPTIBLE';
+  status: 'ACTIVE' | 'WARNING' | 'URGENT' | 'CRITICAL' | 'SUSPENDED' | 'EXPIRED' | 'NON_PRESCRIPTIBLE';
   createdBy: string;
   createdAt: any; // server timestamp
   prescriptionStartDate: Date;

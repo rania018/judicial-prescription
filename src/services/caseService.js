@@ -11,7 +11,8 @@ import {
   where,
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
-import { calculatePrescription, getDaysRemaining } from '../utils/prescription'
+import { calculatePrescription } from '../utils/prescription'
+import { getCaseStatus, normalizeStatus } from '../utils/statusHelpers'
 import {
   canPerformInterruptionType,
   canTakeJudicialActions,
@@ -30,15 +31,8 @@ function normalizeCaseRecord(data) {
   }
 }
 
-export function computeCaseStatus(prescriptionEndDate) {
-  if (prescriptionEndDate === null) return 'NON_PRESCRIPTIBLE'
-  const daysRemaining = getDaysRemaining(prescriptionEndDate)
-  if (daysRemaining === null) return 'ACTIVE'
-  if (daysRemaining <= 0) return 'EXPIRED'
-  if (daysRemaining <= 7) return 'CRITICAL'
-  if (daysRemaining <= 15) return 'URGENT'
-  if (daysRemaining <= 90) return 'WARNING'
-  return 'ACTIVE'
+export function computeCaseStatus(prescriptionEndDate, suspensionHistory) {
+  return getCaseStatus(prescriptionEndDate, suspensionHistory)
 }
 
 function toDate(value) {
@@ -136,10 +130,6 @@ export async function listCases({
   const colRef = collection(db, CASES_COLLECTION)
   const baseConstraints = []
 
-  if (status && status !== 'ALL') {
-    baseConstraints.push(where('status', '==', status))
-  }
-
   if (crimeType && crimeType !== 'ALL') {
     baseConstraints.push(where('crimeType', '==', crimeType))
   }
@@ -169,6 +159,7 @@ export async function listCases({
   return docs
     .map((docSnap) => {
       const data = normalizeCaseRecord(docSnap.data())
+      const currentStatus = getCaseStatus(data.prescriptionEndDate, data.suspensionHistory)
       const accessLevel = userId
         ? getCaseAccessLevel({
             userId,
@@ -180,11 +171,18 @@ export async function listCases({
       return {
         id: docSnap.id,
         ...data,
+        status: currentStatus,
         accessLevel,
         isEditable: accessLevel === 'edit',
       }
     })
     .filter((caseData) => !userId || caseData.accessLevel !== 'none')
+    .filter(
+      (caseData) =>
+        !status ||
+        status === 'ALL' ||
+        normalizeStatus(caseData.status) === normalizeStatus(status),
+    )
 }
 
 export async function getCaseById(caseId, accessOptions = {}) {
@@ -195,6 +193,7 @@ export async function getCaseById(caseId, accessOptions = {}) {
   }
 
   const data = normalizeCaseRecord(snapshot.data())
+  const currentStatus = getCaseStatus(data.prescriptionEndDate, data.suspensionHistory)
   const accessLevel = accessOptions.userId
     ? getCaseAccessLevel({
         userId: accessOptions.userId,
@@ -211,6 +210,7 @@ export async function getCaseById(caseId, accessOptions = {}) {
   return {
     id: snapshot.id,
     ...data,
+    status: currentStatus,
     accessLevel,
     isEditable: accessLevel === 'edit',
   }
@@ -328,7 +328,7 @@ export async function addCaseInterruption(
     interruptionHistory: updatedInterruptionHistory,
     prescriptionStartDate,
     prescriptionEndDate,
-    status: computeCaseStatus(prescriptionEndDate),
+    status: getCaseStatus(prescriptionEndDate, updatedSuspensionHistory),
   })
 }
 
@@ -408,7 +408,7 @@ export async function addCaseSuspension(
     suspensionHistory: updatedSuspensionHistory,
     prescriptionStartDate,
     prescriptionEndDate,
-    status: computeCaseStatus(prescriptionEndDate),
+    status: getCaseStatus(prescriptionEndDate, updatedSuspensionHistory),
   })
 }
 
@@ -475,7 +475,7 @@ export async function resumeCaseFromSuspension(
     suspensionHistory: updatedSuspensionHistory,
     prescriptionStartDate,
     prescriptionEndDate,
-    status: computeCaseStatus(prescriptionEndDate),
+    status: getCaseStatus(prescriptionEndDate, updatedSuspensionHistory),
   })
 
   await addAuditLog({

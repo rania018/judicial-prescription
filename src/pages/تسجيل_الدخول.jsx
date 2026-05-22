@@ -1,16 +1,25 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-// @ts-ignore JSX module implemented in JS
 import { useAuth } from '../context/AuthContext.jsx'
-// @ts-ignore JSX module implemented in JS
 import { useToast } from '../context/ToastContext.jsx'
 
-// حسابات تجريبية للاختبار — عدّل القائمة حسب المستخدمين المُنشئين في Firebase Auth
 const TEST_PASSWORD = 'test123'
 const TEST_ACCOUNTS = [
-  { email: 'clerk@test.com', role: 'كاتب ضبط', desc: 'تسجيل قضايا جديدة' },
-  { email: 'prosecutor@test.com', role: 'عضو نيابة', desc: 'إضافة إجراءات على القضايا' },
-  { email: 'attorney@test.com', role: 'محام عام', desc: 'كل الصلاحيات + إدارة المستخدمين' },
+  {
+    email: 'clerk@test.com',
+    role: 'كاتب ضبط',
+    desc: 'تسجيل القضايا، البحث، والطباعة التشغيلية',
+  },
+  {
+    email: 'prosecutor@test.com',
+    role: 'عضو نيابة',
+    desc: 'متابعة رقابية على مستوى المحكمة',
+  },
+  {
+    email: 'attorney@test.com',
+    role: 'محام عام',
+    desc: 'إشراف أوسع على مستوى المجلس القضائي',
+  },
 ]
 
 export default function تسجيل_الدخول() {
@@ -22,113 +31,158 @@ export default function تسجيل_الدخول() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   const from = location.state?.from?.pathname || '/'
+  const normalizedEmail = email.trim()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
-      await login(email, password)
+      await login(normalizedEmail, password)
       toast.success('تم تسجيل الدخول بنجاح.')
       navigate(from, { replace: true })
-    } catch (err) {
-      setError('بيانات الدخول غير صحيحة أو حدث خطأ في المصادقة.')
-      toast.error('تعذر تسجيل الدخول. يرجى التحقق من البيانات أو المحاولة لاحقاً.')
+    } catch {
+      setError('تعذر التحقق من بيانات الدخول. يرجى التأكد من البريد وكلمة المرور ثم إعادة المحاولة.')
+      toast.error('فشل تسجيل الدخول. تحقق من البيانات أو حاول مرة أخرى بعد قليل.')
     } finally {
       setLoading(false)
     }
   }
 
+  const fillTestAccount = (account) => {
+    setEmail(account.email)
+    setPassword(TEST_PASSWORD)
+    setError('')
+  }
+
   return (
-    <div className="centered-page">
-      <div className="card login-card">
-        <h1 className="login-title">نظام متابعة آجال التقادم</h1>
-        <p className="login-subtitle">
-          فضلاً أدخل بيانات الدخول للوصول إلى النظام.
-        </p>
-
-        <form onSubmit={handleSubmit}>
-          <div className="form-field">
-            <label className="form-label" htmlFor="email">
-              البريد الإلكتروني
-            </label>
-            <input
-              id="email"
-              type="email"
-              className="form-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="form-field" style={{ marginTop: '0.75rem' }}>
-            <label className="form-label" htmlFor="password">
-              كلمة المرور
-            </label>
-            <input
-              id="password"
-              type="password"
-              className="form-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-
-          {error && (
-            <p className="error-text" style={{ marginTop: '0.75rem' }}>
-              {error}
-            </p>
-          )}
-
-          <div className="form-actions" style={{ marginTop: '1.25rem' }}>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={loading}
-            >
-              {loading ? (
-                <>
-                  <span className="spinner" />
-                  <span>جارٍ تسجيل الدخول...</span>
-                </>
-              ) : (
-                'تسجيل الدخول'
-              )}
-            </button>
-          </div>
-        </form>
-
-        <div className="login-test-accounts">
-          <div className="login-test-accounts-title">حسابات تجريبية للاختبار</div>
-          <p className="login-test-accounts-note muted">
-            كلمة المرور لجميع الحسابات: <strong>test123</strong> — انقر على أي حساب لملء الحقول ثم تسجيل الدخول.
+    <div className="login-shell">
+      <div className="login-layout">
+        <section className="login-hero">
+          <span className="login-hero__badge">منصة قضائية داخلية</span>
+          <h1 className="login-hero__title">نظام متابعة آجال التقادم</h1>
+          <p className="login-hero__text">
+            دخول موحّد للجهات القضائية مع عرض عربي واضح، وتنبيهات مرئية تسهّل متابعة الملفات
+            الحساسة وفق الصلاحيات الممنوحة لكل دور.
           </p>
-          <ul className="login-test-accounts-list">
-            {TEST_ACCOUNTS.map((acc) => (
-              <li key={acc.email}>
+
+          <div className="login-hero__features">
+            <div className="login-hero__feature">
+              <strong>متابعة حسب الدور</strong>
+              <span>القاضي، النيابة، المحامي العام، وكتابة الضبط.</span>
+            </div>
+            <div className="login-hero__feature">
+              <strong>تنبيهات الأعمال الحرجة</strong>
+              <span>تصنيف أحمر/أصفر/أخضر بصياغة قضائية واضحة.</span>
+            </div>
+            <div className="login-hero__feature">
+              <strong>تجربة عربية محسّنة</strong>
+              <span>تصميم RTL واضح مع حالات تحميل وخطأ أكثر سلاسة.</span>
+            </div>
+          </div>
+        </section>
+
+        <div className="card login-card login-card--enhanced">
+          <div className="login-card__header">
+            <div>
+              <h2 className="login-title">تسجيل الدخول الآمن</h2>
+              <p className="login-subtitle">
+                أدخل بيانات الاعتماد للوصول إلى مركز المتابعة والتنبيهات.
+              </p>
+            </div>
+            {from !== '/' && (
+              <span className="login-return-chip">سيتم إعادتك إلى الصفحة المطلوبة بعد الدخول</span>
+            )}
+          </div>
+
+          <form onSubmit={handleSubmit} className="login-form" aria-busy={loading}>
+            <div className="form-field">
+              <label className="form-label" htmlFor="email">
+                البريد الإلكتروني
+              </label>
+              <input
+                id="email"
+                type="email"
+                className="form-input"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@justice.dz"
+                autoComplete="username"
+                required
+              />
+            </div>
+
+            <div className="form-field">
+              <label className="form-label" htmlFor="password">
+                كلمة المرور
+              </label>
+              <div className="password-field">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  className="form-input password-field__input"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  placeholder="أدخل كلمة المرور"
+                  required
+                />
                 <button
                   type="button"
-                  className="login-test-account-item"
-                  onClick={() => {
-                    setEmail(acc.email)
-                    setPassword(TEST_PASSWORD)
-                  }}
-                  title="استخدام هذا الحساب"
+                  className="password-field__toggle"
+                  onClick={() => setShowPassword((current) => !current)}
                 >
-                  <span className="login-test-account-email">{acc.email}</span>
-                  <span className="login-test-account-role">{acc.role}</span>
-                  <span className="muted">{acc.desc}</span>
+                  {showPassword ? 'إخفاء' : 'إظهار'}
                 </button>
-              </li>
-            ))}
-          </ul>
+              </div>
+            </div>
+
+            {error && <div className="login-error-box">{error}</div>}
+
+            <div className="form-actions login-form__actions">
+              <button
+                type="submit"
+                className="btn btn-primary login-submit"
+                disabled={loading || !normalizedEmail || !password}
+              >
+                {loading ? (
+                  <>
+                    <span className="spinner" />
+                    <span>جارٍ التحقق من الهوية...</span>
+                  </>
+                ) : (
+                  'دخول إلى النظام'
+                )}
+              </button>
+            </div>
+          </form>
+
+          <div className="login-test-accounts">
+            <div className="login-test-accounts-title">حسابات اختبار سريعة</div>
+            <p className="login-test-accounts-note muted">
+              كلمة المرور الافتراضية لجميع الحسابات: <strong>test123</strong>
+            </p>
+            <ul className="login-test-accounts-list">
+              {TEST_ACCOUNTS.map((account) => (
+                <li key={account.email}>
+                  <button
+                    type="button"
+                    className="login-test-account-item"
+                    onClick={() => fillTestAccount(account)}
+                  >
+                    <span className="login-test-account-email">{account.email}</span>
+                    <span className="login-test-account-role">{account.role}</span>
+                    <span className="muted">{account.desc}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
     </div>
   )
 }
-

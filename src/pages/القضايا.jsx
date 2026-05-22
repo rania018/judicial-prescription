@@ -11,11 +11,12 @@ import { useToast } from '../context/ToastContext.jsx'
 
 const STATUS_FILTERS = [
   { value: 'ALL', label: 'كل الحالات' },
-  { value: 'ACTIVE', label: 'سارية' },
-  { value: 'WARNING', label: 'تنبيه' },
-  { value: 'URGENT', label: 'عاجلة' },
-  { value: 'CRITICAL', label: 'حرجة' },
+  { value: 'CRITICAL', label: 'حرجة خلال أقل من 6 أشهر' },
+  { value: 'WARNING', label: 'متابعة خلال سنة' },
+  { value: 'ACTIVE', label: 'آمنة' },
+  { value: 'SUSPENDED', label: 'موقوفة' },
   { value: 'EXPIRED', label: 'منتهية' },
+  { value: 'NON_PRESCRIPTIBLE', label: 'غير خاضعة للتقادم' },
 ]
 
 const CRIME_TYPE_FILTERS = [
