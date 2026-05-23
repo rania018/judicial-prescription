@@ -33,23 +33,13 @@ function App() {
     <div className="app-shell">
       {user && (
         <header className="app-header">
-          <div className="app-header-inner">
-            <div className="app-header-title">نظام متابعة آجال التقادم</div>
-            <div className="app-header-actions">
-              <جرس_التنبيهات />
-              <button
-                type="button"
-                className="app-nav-toggle"
-                onClick={() => setNavOpen((o) => !o)}
-                aria-expanded={navOpen}
-                aria-label={navOpen ? 'إغلاق القائمة' : 'فتح القائمة'}
-              >
-                <span className="app-nav-toggle-bar" />
-                <span className="app-nav-toggle-bar" />
-                <span className="app-nav-toggle-bar" />
-              </button>
-            </div>
+          {/* Brand — right side */}
+          <div className="app-header-brand">
+            <span className="app-header-brand-icon" aria-hidden="true">⚖</span>
+            نظام متابعة آجال التقادم
           </div>
+
+          {/* Nav links — center */}
           <nav className={`app-nav ${navOpen ? 'app-nav--open' : ''}`}>
             <NavLink
               to="/"
@@ -101,10 +91,27 @@ function App() {
                 إنشاء قضية
               </NavLink>
             )}
-            <button type="button" className="btn btn-secondary" onClick={() => { closeNav(); logout(); }}>
+          </nav>
+
+          {/* Actions — left side */}
+          <div className="app-header-actions">
+            <جرس_التنبيهات />
+            <button type="button" className="btn-logout" onClick={() => { closeNav(); logout(); }}>
               تسجيل الخروج
             </button>
-          </nav>
+            <button
+              type="button"
+              className="app-nav-toggle"
+              onClick={() => setNavOpen((o) => !o)}
+              aria-expanded={navOpen}
+              aria-label={navOpen ? 'إغلاق القائمة' : 'فتح القائمة'}
+            >
+              <span className="app-nav-toggle-bar" />
+              <span className="app-nav-toggle-bar" />
+              <span className="app-nav-toggle-bar" />
+            </button>
+          </div>
+
           {navOpen && (
             <div
               className="app-nav-overlay"

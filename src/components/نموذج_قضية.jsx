@@ -1,11 +1,7 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect, useMemo } from 'react'
 import dayjs from 'dayjs'
-import {
-  INDICTMENT_BRANCH_GROUPS,
-  INDICTMENT_BRANCH_OPTIONS,
-  NON_PRESCRIPTIBLE_CATEGORIES,
-} from '../utils/statusHelpers'
-import { yearsBetween } from '../utils/prescription'
+import { NON_PRESCRIPTIBLE_CATEGORIES } from '../utils/statusHelpers'
+import { yearsBetween, calculatePrescriptionDuration } from '../utils/prescription'
 
 const CRIME_TYPES = [
   { value: 'FELONY', label: 'جناية' },
@@ -40,6 +36,23 @@ const OFFICER_POSITIONS = {
   ],
 }
 
+const CRIME_TYPE_LABELS_MAP = {
+  FELONY: 'جناية',
+  SIMPLE_MISDEMEANOR: 'جنحة بسيطة',
+  AGGRAVATED_MISDEMEANOR: 'جنحة مشددة',
+  VIOLATION: 'مخالفة',
+  EXEMPTED: 'لا تسقط بالتقادم',
+}
+
+function computePreviewStatus(endDateStr) {
+  if (!endDateStr) return null
+  const days = dayjs(endDateStr).diff(dayjs(), 'day')
+  if (days < 0)   return { label: 'منتهٍ',  color: 'var(--color-expired)',          tint: 'var(--color-expired-tint)' }
+  if (days < 180) return { label: 'حرج',     color: 'var(--color-critical)',         tint: 'var(--color-critical-tint)' }
+  if (days < 365) return { label: 'تحذير',   color: 'var(--color-warning)',          tint: 'var(--color-warning-tint)' }
+  return             { label: 'نشط',     color: 'var(--color-safe)',             tint: 'var(--color-safe-tint)' }
+}
+
 export default function نموذج_قضية({ onSubmit, submitting }) {
   const [caseReference, setCaseReference] = useState('')
   const [trackType, setTrackType] = useState('PROSECUTION')
@@ -53,11 +66,8 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
   const [nonPrescriptibleCategory, setNonPrescriptibleCategory] = useState('')
   const [judicialAuthority, setJudicialAuthority] = useState('COURT')
   const [judicialOfficer, setJudicialOfficer] = useState('PROSECUTOR')
-  const [indictmentBranchGroup, setIndictmentBranchGroup] = useState('')
-  const [indictmentBranch, setIndictmentBranch] = useState('')
   const [crimeDate, setCrimeDate] = useState('')
 
-  // Update officer positions when judicial authority changes
   useEffect(() => {
     const availableOfficers = OFFICER_POSITIONS[judicialAuthority] || []
     if (availableOfficers.length > 0) {
@@ -65,7 +75,6 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
     }
   }, [judicialAuthority])
 
-  // Reset prosecution-only fields when switching to PENALTY_EXECUTION
   useEffect(() => {
     if (trackType === 'PENALTY_EXECUTION') {
       setIsMinor(false)
@@ -77,14 +86,12 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
     }
   }, [trackType])
 
-  // Reset appearance date when severity level changes away from HIDDEN
   useEffect(() => {
     if (severityLevel !== 'HIDDEN') {
       setAppearanceDate('')
     }
   }, [severityLevel])
 
-  // Reset non-prescriptible category when crime type changes away from EXEMPTED
   useEffect(() => {
     if (crimeType !== 'EXEMPTED') {
       setNonPrescriptibleCategory('')
@@ -93,59 +100,25 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
 
   const today = dayjs().format('YYYY-MM-DD')
 
-  // In PENALTY_EXECUTION mode, isMinor and HIDDEN are not applicable
-  const isMinorApplicable = trackType === 'PROSECUTION'
-  const isHiddenApplicable = trackType === 'PROSECUTION' && crimeType !== 'VIOLATION' && crimeType !== 'EXEMPTED'
+  const isMinorApplicable        = trackType === 'PROSECUTION'
+  const isHiddenApplicable       = trackType === 'PROSECUTION' && crimeType !== 'VIOLATION' && crimeType !== 'EXEMPTED'
   const isAppearanceDateRequired = severityLevel === 'HIDDEN' && isHiddenApplicable
-  const requiresIndictmentBranch =
-    judicialAuthority === 'COUNCIL' && judicialOfficer === 'INDICTMENT_CHAMBER_PRESIDENT'
-  const hasIndictmentBranchConfig = INDICTMENT_BRANCH_GROUPS.length > 0
-  const currentIndictmentOptions = INDICTMENT_BRANCH_OPTIONS[indictmentBranchGroup] || []
-
-  useEffect(() => {
-    if (!requiresIndictmentBranch || !hasIndictmentBranchConfig) {
-      setIndictmentBranchGroup('')
-      setIndictmentBranch('')
-      return
-    }
-    setIndictmentBranchGroup((prev) => prev || INDICTMENT_BRANCH_GROUPS[0]?.value || '')
-  }, [requiresIndictmentBranch, hasIndictmentBranchConfig])
-
-  useEffect(() => {
-    if (!requiresIndictmentBranch) return
-    if (!hasIndictmentBranchConfig) {
-      setIndictmentBranch('')
-      return
-    }
-    const options = INDICTMENT_BRANCH_OPTIONS[indictmentBranchGroup] || []
-    if (options.length === 0) {
-      setIndictmentBranch('')
-      return
-    }
-    setIndictmentBranch((prev) =>
-      options.some((option) => option.value === prev) ? prev : options[0]?.value || '',
-    )
-  }, [requiresIndictmentBranch, indictmentBranchGroup, hasIndictmentBranchConfig])
-
-  // Severity level options by track and crime type
-  const showSeveritySection = trackType === 'PROSECUTION' && crimeType !== 'VIOLATION' && crimeType !== 'EXEMPTED'
-  const isCustomPenaltyRequired = severityLevel === 'CUSTOM' && crimeType === 'FELONY'
-
-  // Sentence years for PENALTY_EXECUTION + AGGRAVATED_MISDEMEANOR
-  const showSentenceYears = trackType === 'PENALTY_EXECUTION' && crimeType === 'AGGRAVATED_MISDEMEANOR'
-
-  // Validation logic
-  const isSeverityLevelRequired = showSeveritySection && crimeType === 'FELONY'
-
+  const showSeveritySection      = trackType === 'PROSECUTION' && crimeType !== 'VIOLATION' && crimeType !== 'EXEMPTED'
+  const isCustomPenaltyRequired  = severityLevel === 'CUSTOM' && crimeType === 'FELONY'
+  const showSentenceYears        = trackType === 'PENALTY_EXECUTION' && crimeType === 'AGGRAVATED_MISDEMEANOR'
+  const isSeverityLevelRequired  = showSeveritySection && crimeType === 'FELONY'
   const isNonPrescriptibleCategoryRequired = crimeType === 'EXEMPTED'
 
   const isCustomPenaltyValid =
     severityLevel !== 'CUSTOM' ||
     (customPenaltyDuration && customPenaltyDuration >= 1 && customPenaltyDuration <= 30)
-  const isMinorValid = !isMinorApplicable || !isMinor || (minorBirthDate && minorBirthDate <= crimeDate)
+  const isMinorValid =
+    !isMinorApplicable || !isMinor || (minorBirthDate && minorBirthDate <= crimeDate)
   const isAppearanceDateValid =
-    !isAppearanceDateRequired || (appearanceDate && appearanceDate >= crimeDate && appearanceDate <= today)
-  const isSentenceYearsValid = !showSentenceYears || (sentenceYears && sentenceYears >= 5 && sentenceYears <= 20)
+    !isAppearanceDateRequired ||
+    (appearanceDate && appearanceDate >= crimeDate && appearanceDate <= today)
+  const isSentenceYearsValid =
+    !showSentenceYears || (sentenceYears && sentenceYears >= 5 && sentenceYears <= 20)
 
   const isValid =
     caseReference.trim().length > 0 &&
@@ -159,16 +132,16 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
     crimeDate <= today &&
     isMinorValid &&
     isAppearanceDateValid &&
-    isSentenceYearsValid &&
-    (!requiresIndictmentBranch || (hasIndictmentBranchConfig && Boolean(indictmentBranch)))
+    isSentenceYearsValid
 
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!isValid) return
 
-    const crimeDateObj = new Date(crimeDate)
+    const crimeDateObj      = new Date(crimeDate)
     const minorBirthDateObj = isMinor ? new Date(minorBirthDate) : null
-    const appearanceDateObj = isAppearanceDateRequired && appearanceDate ? new Date(appearanceDate) : null
+    const appearanceDateObj =
+      isAppearanceDateRequired && appearanceDate ? new Date(appearanceDate) : null
 
     onSubmit({
       caseReference: caseReference.trim(),
@@ -183,420 +156,467 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
       ...(nonPrescriptibleCategory && { nonPrescriptibleCategory }),
       judicialAuthority,
       judicialOfficer,
-      ...(requiresIndictmentBranch && indictmentBranchGroup && { indictmentBranchGroup }),
-      ...(requiresIndictmentBranch && indictmentBranch && { indictmentBranch }),
       crimeDate: crimeDateObj,
     })
   }
 
+  // ── Live preview computed values ────────────────────────
+  const prescriptionYears = useMemo(() => {
+    if (crimeType === 'EXEMPTED') return null
+    try {
+      return calculatePrescriptionDuration({
+        trackType,
+        crimeType,
+        severityLevel,
+        customPenaltyDuration,
+        sentenceYears,
+      })
+    } catch {
+      return null
+    }
+  }, [trackType, crimeType, severityLevel, customPenaltyDuration, sentenceYears])
+
+  const previewEndDate = useMemo(() => {
+    if (!crimeDate || prescriptionYears === null) return null
+    return dayjs(crimeDate).add(prescriptionYears, 'year').format('YYYY/MM/DD')
+  }, [crimeDate, prescriptionYears])
+
+  const previewStatus = useMemo(() => {
+    if (crimeType === 'EXEMPTED') {
+      return {
+        label: 'لا يسقط',
+        color: 'var(--color-non-prescriptible)',
+        tint: 'var(--color-non-prescriptible-tint)',
+      }
+    }
+    return computePreviewStatus(previewEndDate)
+  }, [crimeType, previewEndDate])
+
+  const durationLabel =
+    crimeType === 'EXEMPTED' ? 'لا تسقط' :
+    prescriptionYears !== null ? `${prescriptionYears} سنة` : 'غير محدد'
+
   return (
-    <form onSubmit={handleSubmit}>
-      <div className="form-grid">
-        <div className="form-field">
-          <label className="form-label" htmlFor="caseReference">
-            الرقم المرجعي للملف
-          </label>
-          <input
-            id="caseReference"
-            type="text"
-            className="form-input"
-            value={caseReference}
-            onChange={(e) => setCaseReference(e.target.value)}
-            required
-          />
-          <p className="muted">المعرّف الفريد للملف — يربط السجل الرقمي بالنسخة الورقية.</p>
+    <div className="nf-layout">
+
+      {/* ── Sticky live preview (right in RTL) ────────────── */}
+      <aside className="nf-preview">
+        <div className="nf-preview__header">
+          <span>📋</span>
+          <span>معاينة حية للقضية</span>
         </div>
 
-        <div className="form-field">
-          <label className="form-label" htmlFor="trackType">
-            المسار الإجرائي
-          </label>
-          <select
-            id="trackType"
-            className="form-select"
-            value={trackType}
-            onChange={(e) => setTrackType(e.target.value)}
-            required
-          >
-            {TRACK_TYPES.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </select>
-          <p className="muted">
-            {trackType === 'PENALTY_EXECUTION'
-              ? 'تقادم العقوبة: يبدأ الأجل من تاريخ الحكم النهائي البات. لا تنطبق الجرائم الخفية أو قضايا الأحداث على هذه المرحلة.'
-              : 'تقادم الدعوى العمومية: يبدأ الأجل من تاريخ اقتراف الجريمة.'}
+        <div className="nf-preview__rows">
+          <div className="nf-preview__row">
+            <span className="nf-preview__label">الرقم المرجعي</span>
+            <span className="nf-preview__value">{caseReference || '—'}</span>
+          </div>
+          <div className="nf-preview__row">
+            <span className="nf-preview__label">نوع الجريمة</span>
+            <span className="nf-preview__value">{CRIME_TYPE_LABELS_MAP[crimeType]}</span>
+          </div>
+          <div className="nf-preview__row">
+            <span className="nf-preview__label">مدة التقادم</span>
+            <span className="nf-preview__value">{durationLabel}</span>
+          </div>
+          <div className="nf-preview__row">
+            <span className="nf-preview__label">تاريخ الجريمة</span>
+            <span className="nf-preview__value">
+              {crimeDate ? dayjs(crimeDate).format('YYYY/MM/DD') : '—'}
+            </span>
+          </div>
+          <div className="nf-preview__row">
+            <span className="nf-preview__label">الحالة المتوقعة</span>
+            <span>
+              {previewStatus ? (
+                <span
+                  style={{
+                    display: 'inline-block',
+                    padding: '2px 10px',
+                    borderRadius: '99px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    background: previewStatus.tint,
+                    color: previewStatus.color,
+                    border: `1px solid ${previewStatus.color}55`,
+                  }}
+                >
+                  {previewStatus.label}
+                </span>
+              ) : '—'}
+            </span>
+          </div>
+        </div>
+
+        <div className="nf-preview__expiry">
+          <p className="nf-preview__expiry-label">تاريخ انتهاء التقادم</p>
+          <p className="nf-preview__expiry-value">
+            {previewEndDate
+              ? previewEndDate
+              : crimeType === 'EXEMPTED'
+              ? 'لا ينطبق'
+              : '—'}
           </p>
         </div>
+      </aside>
 
-        <div className="form-field">
-          <label className="form-label" htmlFor="crimeType">
-            تصنيف وتكييف الجريمة
-          </label>
-          <select
-            id="crimeType"
-            className="form-select"
-            value={crimeType}
-            onChange={(e) => {
-              setCrimeType(e.target.value)
-              if (e.target.value === 'VIOLATION' || e.target.value === 'EXEMPTED') {
-                setSeverityLevel('')
-              }
-            }}
-            required
-          >
-            {CRIME_TYPES.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </select>
-          {crimeType === 'FELONY' && trackType === 'PROSECUTION' && (
-            <p className="muted">الجناية: الأصل 15 سنة. استثناء: قوانين خاصة تُحدد 20 سنة (سجن مؤقت) أو 30 سنة (مؤبد/إعدام).</p>
-          )}
-          {crimeType === 'FELONY' && trackType === 'PENALTY_EXECUTION' && (
-            <p className="muted">تقادم عقوبة الجناية: 20 سنة تحتسب من تاريخ الحكم النهائي.</p>
-          )}
-          {crimeType === 'SIMPLE_MISDEMEANOR' && trackType === 'PROSECUTION' && (
-            <p className="muted">جنحة بسيطة: مدة التقادم 5 سنوات (عقوبتها تساوي أو تقل عن 5 سنوات).</p>
-          )}
-          {crimeType === 'AGGRAVATED_MISDEMEANOR' && trackType === 'PROSECUTION' && (
-            <p className="muted">جنحة مشددة: مدة التقادم 10 سنوات (عقوبتها تفوق 5 سنوات).</p>
-          )}
-          {crimeType === 'AGGRAVATED_MISDEMEANOR' && trackType === 'PENALTY_EXECUTION' && (
-            <p className="muted">تقادم عقوبة الجنحة المشددة: مساوية لمدة العقوبة المحكوم بها (5–20 سنة).</p>
-          )}
-          {crimeType === 'SIMPLE_MISDEMEANOR' && trackType === 'PENALTY_EXECUTION' && (
-            <p className="muted">تقادم عقوبة الجنحة البسيطة: 5 سنوات.</p>
-          )}
-          {crimeType === 'VIOLATION' && (
-            <p className="muted">المخالفة: مدة التقادم سنتان تلقائياً.</p>
-          )}
-          {crimeType === 'EXEMPTED' && (
-            <p className="muted">جرائم لا تسقط بالتقادم: يُعطَّل حساب أي أجل تقادم لهذه الجريمة.</p>
-          )}
-        </div>
+      {/* ── Form (left in RTL) ─────────────────────────────── */}
+      <form onSubmit={handleSubmit}>
 
-        {/* Non-prescriptible category selector */}
-        {crimeType === 'EXEMPTED' && (
-          <div className="form-field">
-            <label className="form-label" htmlFor="nonPrescriptibleCategory">
-              فئة الجريمة غير القابلة للتقادم
-            </label>
-            <select
-              id="nonPrescriptibleCategory"
-              className="form-select"
-              value={nonPrescriptibleCategory}
-              onChange={(e) => setNonPrescriptibleCategory(e.target.value)}
-              required
-            >
-              <option value="">— اختر الفئة —</option>
-              {NON_PRESCRIPTIBLE_CATEGORIES.map((cat) => (
-                <option key={cat.value} value={cat.value}>
-                  {cat.label}
-                </option>
-              ))}
-            </select>
-            <p className="muted">حدد الفئة القانونية التي تندرج ضمنها هذه الجريمة (الجرائم الخمس المحددة حصراً).</p>
-          </div>
-        )}
-
-        {/* Sentence years for PENALTY_EXECUTION + AGGRAVATED_MISDEMEANOR */}
-        {showSentenceYears && (
-          <div className="form-field">
-            <label className="form-label" htmlFor="sentenceYears">
-              مدة الحكم القضائي (بالسنوات)
-            </label>
-            <input
-              id="sentenceYears"
-              type="number"
-              min="5"
-              max="20"
-              className="form-input"
-              value={sentenceYears}
-              onChange={(e) => setSentenceYears(parseInt(e.target.value, 10))}
-              required
-            />
-            <p className="muted">أدخل مدة الحكم المقضي به (من 5 إلى 20 سنة) — تُساوي مدة تقادم العقوبة.</p>
-          </div>
-        )}
-
-        {/* Minor case (PROSECUTION only) */}
-        {trackType === 'PROSECUTION' && (
-          <div className="form-field">
-            <label className="form-label" htmlFor="isMinor">
-              قضية الحدث
-            </label>
-            <label className="form-checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-              <input
-                id="isMinor"
-                type="checkbox"
-                checked={isMinor}
-                onChange={(e) => {
-                  setIsMinor(e.target.checked)
-                  if (!e.target.checked) setMinorBirthDate('')
-                }}
-              />
-              <span>القضية تتعلق بحدث (قاصر) — يُجمَّد الحساب حتى بلوغه سن الرشد (18 سنة)</span>
-            </label>
-          </div>
-        )}
-
-        {trackType === 'PROSECUTION' && isMinor && (
-          <div className="form-field">
-            <label className="form-label" htmlFor="minorBirthDate">
-              تاريخ ميلاد الحدث
-            </label>
-            <input
-              id="minorBirthDate"
-              type="date"
-              className="form-input"
-              max={crimeDate || today}
-              value={minorBirthDate}
-              onChange={(e) => setMinorBirthDate(e.target.value)}
-              required={isMinor}
-            />
-            <p className="muted">تاريخ ميلاد الحدث. يجب أن يكون قبل تاريخ اقتراف الجريمة.</p>
-          </div>
-        )}
-
-        {/* Severity level section — PROSECUTION only */}
-        {showSeveritySection && (
-          <div className="form-field">
-            <label className="form-label" htmlFor="severityLevel">
-              {crimeType === 'FELONY' ? 'الاستثناءات القانونية للجناية' : 'الجرائم الخفية والمخفية'}
-            </label>
-            <div className="form-checkbox-group">
-              {/* HIDDEN — for all eligible prosecution crime types */}
-              <label className="form-checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                <input
-                  id="hidden"
-                  type="checkbox"
-                  checked={severityLevel === 'HIDDEN'}
-                  onChange={(e) => {
-                    setSeverityLevel(e.target.checked ? 'HIDDEN' : '')
-                  }}
-                />
-                <span>جريمة خفية / مخفية — يُدخَل تاريخ الظهور للعلن لضبط المدة المتبقية</span>
-              </label>
-
-              {/* EQUAL_TO_SENTENCE — FELONY only */}
-              {crimeType === 'FELONY' && (
-                <label className="form-checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                  <input
-                    id="equal_to_sentence"
-                    type="checkbox"
-                    checked={severityLevel === 'EQUAL_TO_SENTENCE'}
-                    onChange={(e) => {
-                      setSeverityLevel(e.target.checked ? 'EQUAL_TO_SENTENCE' : '')
-                    }}
-                  />
-                  <span>عقوبة مؤبد أو إعدام — مدة التقادم 30 سنة</span>
-                </label>
-              )}
-
-              {/* CUSTOM — FELONY only */}
-              {crimeType === 'FELONY' && (
-                <label className="form-checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                  <input
-                    id="custom"
-                    type="checkbox"
-                    checked={severityLevel === 'CUSTOM'}
-                    onChange={(e) => {
-                      setSeverityLevel(e.target.checked ? 'CUSTOM' : '')
-                    }}
-                  />
-                  <span>قانون خاص — مدة التقادم 20 سنة أو مدة مخصصة</span>
-                </label>
-              )}
+        {/* ── Section 1 : معلومات الملف ──────────────────── */}
+        <div className="nf-section-card">
+          <div className="nf-section-header">
+            <span className="nf-section-icon nf-section-icon--blue">🗂</span>
+            <div>
+              <h3 className="nf-section-title">معلومات الملف</h3>
+              <p className="nf-section-subtitle">البيانات التعريفية للقضية والمسار الإجرائي</p>
             </div>
-
-            {severityLevel === 'CUSTOM' && crimeType === 'FELONY' && (
-              <div className="mt-2">
-                <label className="form-label" htmlFor="customPenaltyDuration">
-                  مدة التقادم الخاصة (بالسنوات)
-                </label>
+          </div>
+          <div className="nf-section-body">
+            <div className="ds-form-grid">
+              <div className="ds-form-group">
+                <label className="ds-form-label" htmlFor="caseReference">الرقم المرجعي للملف</label>
                 <input
-                  id="customPenaltyDuration"
-                  type="number"
-                  min="1"
-                  max="30"
-                  className="form-input"
-                  value={customPenaltyDuration}
-                  onChange={(e) => setCustomPenaltyDuration(parseInt(e.target.value, 10))}
+                  id="caseReference"
+                  type="text"
+                  className="ds-form-input"
+                  placeholder="مثال: l26-001"
+                  value={caseReference}
+                  onChange={(e) => setCaseReference(e.target.value)}
                   required
                 />
-                <p className="muted">أدخل المدة المنصوص عليها في القانون الخاص (مثلاً: 20 سنة).</p>
+                <span className="ds-form-hint">المعرّف الفريد للملف — يربط السجل الرقمي بالنسخة الورقية.</span>
               </div>
-            )}
-          </div>
-        )}
 
-        {/* Appearance date — hidden crimes in PROSECUTION track only */}
-        {isAppearanceDateRequired && (
-          <div className="form-field">
-            <label className="form-label" htmlFor="appearanceDate">
-              تاريخ الظهور للعلن
-            </label>
-            <input
-              id="appearanceDate"
-              type="date"
-              className="form-input"
-              min={crimeDate || undefined}
-              max={today}
-              value={appearanceDate}
-              onChange={(e) => setAppearanceDate(e.target.value)}
-              required
-            />
-            <p className="muted">
-              التاريخ الذي كُشف فيه عن الجريمة للعموم. يجب أن يكون بعد تاريخ الاقتراف وليس مستقبلياً.
-              {(() => {
-                const elapsed = yearsBetween(crimeDate ? new Date(crimeDate) : null, appearanceDate ? new Date(appearanceDate) : null)
-                if (elapsed === null || elapsed < 0) return null
-                return (
-                  <span style={{ display: 'block', marginTop: '0.25rem', fontWeight: 600 }}>
-                    المدة الفاصلة بين الاقتراف والظهور: {elapsed} سنة.
-                  </span>
-                )
-              })()}
-            </p>
-          </div>
-        )}
+              <div className="ds-form-group">
+                <label className="ds-form-label" htmlFor="trackType">المسار الإجرائي</label>
+                <select
+                  id="trackType"
+                  className="ds-form-select"
+                  value={trackType}
+                  onChange={(e) => setTrackType(e.target.value)}
+                  required
+                >
+                  {TRACK_TYPES.map((type) => (
+                    <option key={type.value} value={type.value}>{type.label}</option>
+                  ))}
+                </select>
+                <span className="ds-form-hint">
+                  {trackType === 'PENALTY_EXECUTION'
+                    ? 'تقادم العقوبة: يبدأ من تاريخ الحكم النهائي البات.'
+                    : 'تقادم الدعوى العمومية: يبدأ من تاريخ اقتراف الجريمة.'}
+                </span>
+              </div>
 
-        <div className="form-field">
-          <label className="form-label" htmlFor="judicialAuthority">
-            الجهة القضائية
-          </label>
-          <select
-            id="judicialAuthority"
-            className="form-select"
-            value={judicialAuthority}
-            onChange={(e) => setJudicialAuthority(e.target.value)}
-            required
-          >
-            {JUDICIAL_AUTHORITIES.map((auth) => (
-              <option key={auth.value} value={auth.value}>
-                {auth.label}
-              </option>
-            ))}
-          </select>
-        </div>
+              <div className="ds-form-group">
+                <label className="ds-form-label" htmlFor="crimeType">تصنيف الجريمة</label>
+                <select
+                  id="crimeType"
+                  className="ds-form-select"
+                  value={crimeType}
+                  onChange={(e) => {
+                    setCrimeType(e.target.value)
+                    if (e.target.value === 'VIOLATION' || e.target.value === 'EXEMPTED') {
+                      setSeverityLevel('')
+                    }
+                  }}
+                  required
+                >
+                  {CRIME_TYPES.map((type) => (
+                    <option key={type.value} value={type.value}>{type.label}</option>
+                  ))}
+                </select>
+                {crimeType === 'FELONY' && trackType === 'PROSECUTION' && (
+                  <span className="ds-form-hint">الجناية: الأصل 15 سنة. استثناء: قوانين خاصة تُحدد 20 أو 30 سنة.</span>
+                )}
+                {crimeType === 'FELONY' && trackType === 'PENALTY_EXECUTION' && (
+                  <span className="ds-form-hint">تقادم عقوبة الجناية: 20 سنة من تاريخ الحكم النهائي.</span>
+                )}
+                {crimeType === 'SIMPLE_MISDEMEANOR' && (
+                  <span className="ds-form-hint">جنحة بسيطة: مدة التقادم 5 سنوات.</span>
+                )}
+                {crimeType === 'AGGRAVATED_MISDEMEANOR' && trackType === 'PROSECUTION' && (
+                  <span className="ds-form-hint">جنحة مشددة: مدة التقادم 10 سنوات.</span>
+                )}
+                {crimeType === 'AGGRAVATED_MISDEMEANOR' && trackType === 'PENALTY_EXECUTION' && (
+                  <span className="ds-form-hint">تقادم العقوبة: مساوية لمدة الحكم (5–20 سنة).</span>
+                )}
+                {crimeType === 'VIOLATION' && (
+                  <span className="ds-form-hint">المخالفة: مدة التقادم سنتان.</span>
+                )}
+                {crimeType === 'EXEMPTED' && (
+                  <span className="ds-form-hint">لا تسقط بالتقادم — يُعطَّل حساب الأجل.</span>
+                )}
+              </div>
 
-        <div className="form-field">
-          <label className="form-label" htmlFor="judicialOfficer">
-            الصفة القضائية
-          </label>
-          <select
-            id="judicialOfficer"
-            className="form-select"
-            value={judicialOfficer}
-            onChange={(e) => setJudicialOfficer(e.target.value)}
-            required
-          >
-            {OFFICER_POSITIONS[judicialAuthority]?.map((officer) => (
-              <option key={officer.value} value={officer.value}>
-                {officer.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {requiresIndictmentBranch && !hasIndictmentBranchConfig && (
-          <div className="form-field">
-            <p className="muted">تعذر تحميل تفريعات رئيس غرفة الاتهام حالياً. يرجى مراجعة إعدادات النظام.</p>
-          </div>
-        )}
-
-        {requiresIndictmentBranch && hasIndictmentBranchConfig && (
-          <>
-            <div className="form-field">
-              <label className="form-label" htmlFor="indictmentBranchGroup">
-                تفريع رئيس غرفة الاتهام
-              </label>
-              <select
-                id="indictmentBranchGroup"
-                className="form-select"
-                value={indictmentBranchGroup}
-                onChange={(e) => setIndictmentBranchGroup(e.target.value)}
-                required
-              >
-                {INDICTMENT_BRANCH_GROUPS.map((group) => (
-                  <option key={group.value} value={group.value}>
-                    {group.label}
-                  </option>
-                ))}
-              </select>
+              {crimeType === 'EXEMPTED' && (
+                <div className="ds-form-group">
+                  <label className="ds-form-label" htmlFor="nonPrescriptibleCategory">فئة الجريمة</label>
+                  <select
+                    id="nonPrescriptibleCategory"
+                    className="ds-form-select"
+                    value={nonPrescriptibleCategory}
+                    onChange={(e) => setNonPrescriptibleCategory(e.target.value)}
+                    required
+                  >
+                    <option value="">— اختر الفئة —</option>
+                    {NON_PRESCRIPTIBLE_CATEGORIES.map((cat) => (
+                      <option key={cat.value} value={cat.value}>{cat.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
+          </div>
+        </div>
 
-            <div className="form-field">
-              <label className="form-label" htmlFor="indictmentBranch">
-                نوع الملف داخل التفريع
-              </label>
-              <select
-                id="indictmentBranch"
-                className="form-select"
-                value={indictmentBranch}
-                onChange={(e) => setIndictmentBranch(e.target.value)}
-                required
-              >
-                {currentIndictmentOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <p className="muted">اختيار ديناميكي مبسط يعكس نوافذ رئيس غرفة الاتهام المطلوبة.</p>
+        {/* ── Section 2 : تفاصيل القضية ──────────────────── */}
+        <div className="nf-section-card">
+          <div className="nf-section-header">
+            <span className="nf-section-icon nf-section-icon--teal">⚖️</span>
+            <div>
+              <h3 className="nf-section-title">تفاصيل القضية</h3>
+              <p className="nf-section-subtitle">الجهة القضائية والتاريخ المرجعي لاحتساب الأجل</p>
             </div>
-          </>
+          </div>
+          <div className="nf-section-body">
+            <div className="ds-form-grid">
+              <div className="ds-form-group">
+                <label className="ds-form-label" htmlFor="judicialAuthority">الجهة القضائية</label>
+                <select
+                  id="judicialAuthority"
+                  className="ds-form-select"
+                  value={judicialAuthority}
+                  onChange={(e) => setJudicialAuthority(e.target.value)}
+                  required
+                >
+                  {JUDICIAL_AUTHORITIES.map((auth) => (
+                    <option key={auth.value} value={auth.value}>{auth.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="ds-form-group">
+                <label className="ds-form-label" htmlFor="judicialOfficer">الصفة القضائية</label>
+                <select
+                  id="judicialOfficer"
+                  className="ds-form-select"
+                  value={judicialOfficer}
+                  onChange={(e) => setJudicialOfficer(e.target.value)}
+                  required
+                >
+                  {OFFICER_POSITIONS[judicialAuthority]?.map((officer) => (
+                    <option key={officer.value} value={officer.value}>{officer.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="ds-form-group">
+                <label className="ds-form-label" htmlFor="crimeDate">
+                  {trackType === 'PENALTY_EXECUTION'
+                    ? 'تاريخ الحكم النهائي البات'
+                    : 'تاريخ اقتراف الجريمة'}
+                </label>
+                <input
+                  id="crimeDate"
+                  type="date"
+                  className="ds-form-input"
+                  max={today}
+                  value={crimeDate}
+                  onChange={(e) => {
+                    setCrimeDate(e.target.value)
+                    if (appearanceDate && appearanceDate < e.target.value) {
+                      setAppearanceDate('')
+                    }
+                  }}
+                  required
+                />
+                <span className="ds-form-hint">
+                  {trackType === 'PENALTY_EXECUTION'
+                    ? 'نقطة انطلاق حساب تقادم العقوبة.'
+                    : 'نقطة انطلاق حساب أجل التقادم.'}
+                </span>
+              </div>
+
+              {trackType === 'PROSECUTION' && (
+                <div className="ds-form-group">
+                  <label className="ds-form-label">قضية الحدث (قاصر)</label>
+                  <label className="ds-checkbox-label">
+                    <input
+                      id="isMinor"
+                      type="checkbox"
+                      checked={isMinor}
+                      onChange={(e) => {
+                        setIsMinor(e.target.checked)
+                        if (!e.target.checked) setMinorBirthDate('')
+                      }}
+                    />
+                    <span>القضية تتعلق بحدث — يُجمَّد الحساب حتى بلوغه سن الرشد (18 سنة)</span>
+                  </label>
+                </div>
+              )}
+
+              {trackType === 'PROSECUTION' && isMinor && (
+                <div className="ds-form-group">
+                  <label className="ds-form-label" htmlFor="minorBirthDate">تاريخ ميلاد الحدث</label>
+                  <input
+                    id="minorBirthDate"
+                    type="date"
+                    className="ds-form-input"
+                    max={crimeDate || today}
+                    value={minorBirthDate}
+                    onChange={(e) => setMinorBirthDate(e.target.value)}
+                    required={isMinor}
+                  />
+                </div>
+              )}
+
+              {showSentenceYears && (
+                <div className="ds-form-group">
+                  <label className="ds-form-label" htmlFor="sentenceYears">مدة الحكم (سنوات)</label>
+                  <input
+                    id="sentenceYears"
+                    type="number"
+                    min="5"
+                    max="20"
+                    className="ds-form-input"
+                    value={sentenceYears}
+                    onChange={(e) => setSentenceYears(parseInt(e.target.value, 10))}
+                    required
+                  />
+                  <span className="ds-form-hint">مدة تقادم العقوبة = مدة الحكم المحكوم به (5–20 سنة).</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Section 3 : الاستثناءات القانونية ─────────── */}
+        {showSeveritySection && (
+          <div className="nf-section-card">
+            <div className="nf-section-header">
+              <span className="nf-section-icon nf-section-icon--amber">⚠️</span>
+              <div>
+                <h3 className="nf-section-title">الاستثناءات القانونية</h3>
+                <p className="nf-section-subtitle">تؤثر مباشرة على مدة التقادم المحتسبة</p>
+              </div>
+            </div>
+            <div className="nf-section-body">
+
+              <label className="nf-check-item">
+                <input
+                  type="checkbox"
+                  checked={severityLevel === 'HIDDEN'}
+                  onChange={(e) => setSeverityLevel(e.target.checked ? 'HIDDEN' : '')}
+                />
+                <div className="nf-check-item__body">
+                  <div className="nf-check-item__title">
+                    جريمة خفية أو مخفية
+                    <span className="nf-check-badge nf-check-badge--blue">تأجيل البداية</span>
+                  </div>
+                  <div className="nf-check-item__desc">يُدخَل تاريخ الظهور للإعلان لضبط المدة المتبقية</div>
+                </div>
+              </label>
+
+              {crimeType === 'FELONY' && (
+                <label className="nf-check-item">
+                  <input
+                    type="checkbox"
+                    checked={severityLevel === 'EQUAL_TO_SENTENCE'}
+                    onChange={(e) => setSeverityLevel(e.target.checked ? 'EQUAL_TO_SENTENCE' : '')}
+                  />
+                  <div className="nf-check-item__body">
+                    <div className="nf-check-item__title">
+                      عقوبة مؤبد أو إعدام
+                      <span className="nf-check-badge nf-check-badge--amber">تمديد إلى 30 سنة</span>
+                    </div>
+                    <div className="nf-check-item__desc">مدة التقادم تصبح 30 سنة بدلاً من المدة العادية</div>
+                  </div>
+                </label>
+              )}
+
+              {crimeType === 'FELONY' && (
+                <label className="nf-check-item">
+                  <input
+                    type="checkbox"
+                    checked={severityLevel === 'CUSTOM'}
+                    onChange={(e) => setSeverityLevel(e.target.checked ? 'CUSTOM' : '')}
+                  />
+                  <div className="nf-check-item__body">
+                    <div className="nf-check-item__title">
+                      قانون خاص بمدة مخصصة
+                      <span className="nf-check-badge nf-check-badge--purple">سنة استثنائية</span>
+                    </div>
+                    <div className="nf-check-item__desc">مدة التقادم 20 سنة أو مدة مخصصة بنص قانوني خاص</div>
+                  </div>
+                </label>
+              )}
+
+              {isCustomPenaltyRequired && (
+                <div className="nf-sub-field">
+                  <div className="ds-form-group" style={{ maxWidth: '280px' }}>
+                    <label className="ds-form-label" htmlFor="customPenaltyDuration">مدة التقادم الخاصة (سنوات)</label>
+                    <input
+                      id="customPenaltyDuration"
+                      type="number"
+                      min="1"
+                      max="30"
+                      className="ds-form-input"
+                      value={customPenaltyDuration}
+                      onChange={(e) => setCustomPenaltyDuration(parseInt(e.target.value, 10))}
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              {isAppearanceDateRequired && (
+                <div className="nf-sub-field">
+                  <div className="ds-form-group" style={{ maxWidth: '280px' }}>
+                    <label className="ds-form-label" htmlFor="appearanceDate">تاريخ الظهور للعلن</label>
+                    <input
+                      id="appearanceDate"
+                      type="date"
+                      className="ds-form-input"
+                      min={crimeDate || undefined}
+                      max={today}
+                      value={appearanceDate}
+                      onChange={(e) => setAppearanceDate(e.target.value)}
+                      required
+                    />
+                    <span className="ds-form-hint">
+                      {(() => {
+                        const elapsed = yearsBetween(
+                          crimeDate ? new Date(crimeDate) : null,
+                          appearanceDate ? new Date(appearanceDate) : null,
+                        )
+                        if (elapsed === null || elapsed < 0) return 'التاريخ الذي كُشف فيه عن الجريمة.'
+                        return `المدة الفاصلة بين الاقتراف والظهور: ${elapsed} سنة.`
+                      })()}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </div>
         )}
 
-        <div className="form-field">
-          <label className="form-label" htmlFor="crimeDate">
-            {trackType === 'PENALTY_EXECUTION'
-              ? 'تاريخ الحكم النهائي الحائز لقوة الشيء المقضي فيه'
-              : 'تاريخ اقتراف الجريمة'}
-          </label>
-          <input
-            id="crimeDate"
-            type="date"
-            className="form-input"
-            max={today}
-            value={crimeDate}
-            onChange={(e) => {
-              setCrimeDate(e.target.value)
-              // Reset appearance date if it's now before the new crime date
-              if (appearanceDate && appearanceDate < e.target.value) {
-                setAppearanceDate('')
-              }
-            }}
-            required
-          />
-          <p className="muted">
-            {trackType === 'PENALTY_EXECUTION'
-              ? 'تاريخ صدور الحكم النهائي البات — هذا هو نقطة الانطلاق القانونية لحساب تقادم العقوبة.'
-              : 'تاريخ وقوع الجريمة — نقطة الانطلاق الزمنية لحساب أجل التقادم.'}
-          </p>
-        </div>
-      </div>
-
-      <div className="form-actions">
         <button
           type="submit"
-          className="btn btn-primary"
+          className="ds-btn ds-btn--primary ds-btn--full"
           disabled={!isValid || submitting}
         >
           {submitting ? (
             <>
-              <span className="spinner" />
+              <span className="ds-spinner" style={{ borderTopColor: '#fff', width: 16, height: 16 }} />
               <span>جارٍ تسجيل الملف...</span>
             </>
           ) : (
             'تسجيل معلومات الملف'
           )}
         </button>
-      </div>
-    </form>
+      </form>
+    </div>
   )
 }

@@ -7,6 +7,7 @@ import { AuthProvider } from './context/AuthContext.jsx'
 // @ts-ignore JSX modules are implemented in JS
 import { ToastProvider } from './context/ToastContext.jsx'
 import './styles/global.css'
+import './styles/design-system.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

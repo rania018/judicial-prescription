@@ -35,28 +35,20 @@ export default function إنشاء_قضية() {
 
   return (
     <div>
-      <div className="page-header">
-        <h2 className="page-title">تسجيل قضية جديدة</h2>
-      </div>
-
-      <div className="card">
-        <div className="card-header">
-          <div>
-            <div className="card-title">تسجيل معلومات الملف الجزائي</div>
-            <div className="card-subtitle">
-              تعبئة الحقول المعتمدة لتسجيل قضية جديدة مع احتساب أجل التقادم تلقائياً.
-            </div>
-          </div>
+      <div className="ds-page-header">
+        <div>
+          <h2 className="ds-page-title">تسجيل قضية جديدة</h2>
+          <p className="ds-page-subtitle">تعبئة الحقول المعتمدة لتسجيل ملف جزائي جديد واحتساب أجل التقادم تلقائياً.</p>
         </div>
-
-        {error && (
-          <p className="error-text" style={{ marginBottom: '1rem' }}>
-            {error}
-          </p>
-        )}
-
-        <نموذج_قضية onSubmit={handleSubmit} submitting={submitting} />
       </div>
+
+      {error && (
+        <p className="error-text" style={{ marginBottom: '1rem' }}>
+          {error}
+        </p>
+      )}
+
+      <نموذج_قضية onSubmit={handleSubmit} submitting={submitting} />
     </div>
   )
 }

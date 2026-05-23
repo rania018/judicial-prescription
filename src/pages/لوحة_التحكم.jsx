@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Doughnut } from 'react-chartjs-2'
+import {
+  ArcElement,
+  Chart as ChartJS,
+  Legend,
+  Tooltip,
+} from 'chart.js'
 import { listCases } from '../services/caseService'
+import { seedFakeCases } from '../utils/seedCases.js'
 import { formatTodayArabic, getDaysRemaining } from '../utils/prescription'
 import {
   CRIME_TYPE_LABELS,
-  STATUS_CARD_CLASS,
   STATUS_ORDER,
-  getStatusDescription,
   getStatusLabel,
 } from '../utils/statusHelpers'
 import {
@@ -17,8 +23,12 @@ import {
 } from '../utils/dashboardAlerts'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
-import شارة_الحالة from '../components/شارة_الحالة.jsx'
+import MetricCard from '../components/MetricCard.jsx'
+import AlertRow from '../components/AlertRow.jsx'
+import StatusBadge from '../components/StatusBadge.jsx'
 import شريط_الإشعارات from '../components/شريط_الإشعارات.jsx'
+
+ChartJS.register(ArcElement, Tooltip, Legend)
 
 const CRIME_TYPES = [
   'FELONY',
@@ -60,6 +70,7 @@ export default function لوحة_التحكم() {
   const [allCases, setAllCases] = useState([])
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState(null)
+  const [seeding, setSeeding] = useState(false)
   const [notifiedHighPriority, setNotifiedHighPriority] = useState(false)
   const [notifiedFollowUp, setNotifiedFollowUp] = useState(false)
 
@@ -81,6 +92,25 @@ export default function لوحة_التحكم() {
   useEffect(() => {
     load()
   }, [load])
+
+  const handleSeed = async () => {
+    setSeeding(true)
+    try {
+      const results = await seedFakeCases(user?.uid, userProfile)
+      const failed = results.filter((r) => !r.ok)
+      if (failed.length) {
+        toast.error(`فشل إنشاء ${failed.length} ملف`)
+      } else {
+        toast.success(`تم إنشاء ${results.length} ملف تجريبي بنجاح`)
+      }
+      await load()
+    } catch (err) {
+      toast.error('خطأ أثناء إنشاء البيانات التجريبية')
+    } finally {
+      setSeeding(false)
+    }
+  }
+
 
   const totalCases = allCases.length
   const counts = useMemo(() => buildStatusCounts(allCases), [allCases])
@@ -233,128 +263,148 @@ export default function لوحة_التحكم() {
 
   if (loading) {
     return (
-      <div className="dashboard">
-        <div className="card dashboard-loading">
-          <div className="dashboard-loading-inner">
-            <div className="spinner" />
-            <span>جاري تحميل بيانات مركز المتابعة...</span>
-          </div>
-        </div>
+      <div className="ds-loading" style={{ justifyContent: 'center', padding: '60px' }}>
+        <div className="ds-spinner" />
+        <span>جاري تحميل بيانات مركز المتابعة...</span>
       </div>
     )
   }
 
   if (totalCases === 0) {
     return (
-      <div className="dashboard">
-        <div className="page-header page-header--dashboard">
+      <div className="ds-dashboard">
+        <div className="ds-page-header">
           <div>
-            <h2 className="page-title">مركز المتابعة والتنبيهات</h2>
-            <p className="dashboard-date muted">{formatTodayArabic()}</p>
+            <h2 className="ds-page-title">مركز المتابعة والتنبيهات</h2>
+            <p className="ds-page-subtitle">{formatTodayArabic()}</p>
           </div>
         </div>
-
-        <div className="card dashboard-empty">
-          <div className="dashboard-empty-content">
-            <h3 className="dashboard-empty-title">لا توجد قضايا متاحة حالياً</h3>
-            <p className="dashboard-empty-text muted">
-              سيظهر مركز المتابعة والتنبيهات بمجرد توفر قضايا ضمن نطاق الصلاحيات الحالي.
+        <div className="ds-card">
+          <div className="ds-empty">
+            <div className="ds-empty-icon">⚖</div>
+            <p className="ds-empty-text">
+              لا توجد قضايا متاحة حالياً — سيظهر مركز المتابعة بمجرد توفر ملفات ضمن نطاق صلاحياتك.
             </p>
-            {role === 'CLERK' && (
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => navigate('/إنشاء-قضية')}
-              >
-                تسجيل قضية جديدة
+            <div className="gap-row mt-2">
+              {role === 'CLERK' && (
+                <button type="button" className="ds-btn ds-btn--primary" onClick={() => navigate('/إنشاء-قضية')}>
+                  تسجيل قضية جديدة
+                </button>
+              )}
+              <button type="button" className="ds-btn ds-btn--secondary" onClick={() => navigate('/القضايا')}>
+                فتح سجل القضايا
               </button>
-            )}
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => navigate('/القضايا')}
-            >
-              فتح سجل القضايا
-            </button>
+            </div>
           </div>
         </div>
       </div>
     )
   }
 
+  // ─── Donut chart data ──────────────────────────────────────
+  const donutColors = {
+    CRITICAL: '#C0392B',
+    WARNING: '#D4A017',
+    ACTIVE: '#1e8449',
+    SUSPENDED: '#7d3c98',
+    EXPIRED: '#555555',
+  }
+  const donutData = {
+    labels: STATUS_ORDER.filter((k) => k !== 'NON_PRESCRIPTIBLE').map(getStatusLabel),
+    datasets: [
+      {
+        data: STATUS_ORDER.filter((k) => k !== 'NON_PRESCRIPTIBLE').map((k) => counts[k] ?? 0),
+        backgroundColor: STATUS_ORDER.filter((k) => k !== 'NON_PRESCRIPTIBLE').map(
+          (k) => donutColors[k] || '#ccc',
+        ),
+        borderWidth: 2,
+        borderColor: '#ffffff',
+      },
+    ],
+  }
+  const donutOptions = {
+    cutout: '68%',
+    plugins: { legend: { display: false }, tooltip: { rtl: true } },
+    maintainAspectRatio: true,
+  }
+
+  // ─── Top 5 nearest expiry ──────────────────────────────────
+  const nearestFive = [...allCases]
+    .filter((c) => c.prescriptionEndDate && c.status !== 'NON_PRESCRIPTIBLE')
+    .sort((a, b) => {
+      const da = typeof a.prescriptionEndDate?.toDate === 'function'
+        ? a.prescriptionEndDate.toDate()
+        : new Date(a.prescriptionEndDate)
+      const db = typeof b.prescriptionEndDate?.toDate === 'function'
+        ? b.prescriptionEndDate.toDate()
+        : new Date(b.prescriptionEndDate)
+      return da - db
+    })
+    .slice(0, 5)
+
+  // ─── Bar chart max ─────────────────────────────────────────
+  const maxCrimeCount = Math.max(...Object.values(crimeTypeCounts), 1)
+
   return (
-    <div className="dashboard">
-      <div className="page-header page-header--dashboard">
+    <div className="ds-dashboard">
+      {/* Page header */}
+      <div className="ds-page-header">
         <div>
-          <h2 className="page-title">مركز المتابعة والتنبيهات</h2>
-          <p className="dashboard-date muted">{formatTodayArabic()}</p>
+          <h2 className="ds-page-title">مركز المتابعة والتنبيهات</h2>
+          <p className="ds-page-subtitle">{formatTodayArabic()} &nbsp;·&nbsp; {dashboardCopy.label}</p>
         </div>
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={load}
-          disabled={loading}
-          aria-label="تحديث بيانات مركز المتابعة"
-        >
-          {loading ? (
-            <>
-              <span className="spinner" />
-              <span>جاري التحديث...</span>
-            </>
-          ) : (
-            'تحديث البيانات'
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button
+            type="button"
+            className="ds-btn ds-btn--secondary ds-btn--sm"
+            onClick={load}
+            disabled={loading}
+          >
+            تحديث البيانات
+          </button>
+          {import.meta.env.DEV && (
+            <button
+              type="button"
+              className="ds-btn ds-btn--secondary ds-btn--sm"
+              style={{ opacity: 0.7, fontSize: '12px' }}
+              onClick={handleSeed}
+              disabled={seeding}
+            >
+              {seeding ? '⏳ جارٍ الإضافة...' : '🧪 بيانات تجريبية'}
+            </button>
           )}
-        </button>
+        </div>
       </div>
 
       <شريط_الإشعارات banner={banner} />
 
-      <section className="card dashboard-hero">
-        <div className="dashboard-hero__copy">
-          <span className="dashboard-hero__eyebrow">{dashboardCopy.label}</span>
-          <h3 className="dashboard-hero__title">{dashboardCopy.title}</h3>
-          <p className="dashboard-hero__text">{dashboardCopy.description}</p>
-          {lastUpdated != null && <p className="dashboard-meta muted">{getLastUpdatedText(lastUpdated)}</p>}
-        </div>
+      {/* Metrics row — 6 cards */}
+      <div className="ds-metrics-row">
+        <MetricCard label="إجمالي الملفات" value={totalCases} variant="neutral" />
+        <MetricCard label={role === 'CLERK' ? 'ملفات حرجة' : 'تنبيهات حمراء'} value={counts.CRITICAL || 0} variant="critical" />
+        <MetricCard label="متابعة خلال سنة" value={counts.WARNING || 0} variant="warning" />
+        <MetricCard label="ملفات آمنة" value={counts.ACTIVE || 0} variant="safe" />
+        <MetricCard label="ملفات موقوفة" value={counts.SUSPENDED || 0} variant="suspended" />
+        <MetricCard label="ملفات منتهية" value={counts.EXPIRED || 0} variant="expired" />
+      </div>
 
-        <div className="dashboard-quick-actions">
-          {quickActions.map((action) => (
-            <button
-              key={action.key}
-              type="button"
-              className={`dashboard-quick-action dashboard-quick-action--${action.variant}`}
-              onClick={action.onClick}
-            >
-              {action.label}
-            </button>
-          ))}
-        </div>
-      </section>
+      {/* Main 2-col grid */}
+      <div className="ds-dashboard-grid">
 
-      <section className="dashboard-metrics">
-        {summaryMetrics.map((metric) => (
-          <div
-            key={metric.key}
-            className={`dashboard-metric-card dashboard-metric-card--${metric.tone}`}
-          >
-            <span className="dashboard-metric-card__label">{metric.label}</span>
-            <strong className="dashboard-metric-card__value">{metric.value}</strong>
-          </div>
-        ))}
-      </section>
+        {/* LEFT COL — alerts + crime bar chart + shortcuts */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
-      <div className="dashboard-grid">
-        <div className="dashboard-grid__main">
-          <section className="card dashboard-panel">
-            <div className="card-header dashboard-panel__header">
+          {/* Alerts panel */}
+          <div className="ds-card">
+            <div className="ds-card-header">
               <div>
-                <div className="card-title">{dashboardCopy.alertsTitle}</div>
-                <div className="card-subtitle">{dashboardCopy.alertsSubtitle}</div>
+                <div className="ds-card-title">{dashboardCopy.alertsTitle}</div>
+                <div className="ds-card-subtitle">{dashboardCopy.alertsSubtitle}</div>
               </div>
               {alerts.length > 0 && (
                 <button
                   type="button"
-                  className="btn btn-secondary"
+                  className="ds-btn ds-btn--secondary ds-btn--sm"
                   onClick={() =>
                     navigate('/القضايا', {
                       state: { statusFilter: alerts[0].priority === 'high' ? 'CRITICAL' : 'WARNING' },
@@ -367,165 +417,158 @@ export default function لوحة_التحكم() {
             </div>
 
             {alerts.length === 0 ? (
-              <div className="dashboard-empty-state">
-                <h4>لا توجد تنبيهات حمراء أو صفراء حالياً</h4>
-                <p className="muted">
-                  جميع الملفات الحالية في وضع آمن أو ضمن حالات خاصة مثل الوقف أو الانتهاء.
-                </p>
+              <div className="ds-safe-summary">
+                <span>✓</span>
+                <span>لا توجد تنبيهات — جميع الملفات في وضع آمن أو حالات خاصة.</span>
               </div>
             ) : (
-              <div className="dashboard-alert-list">
-                {alerts.slice(0, 8).map((alert) => (
-                  <button
+              <>
+                {alerts.slice(0, 6).map((alert) => (
+                  <AlertRow
                     key={alert.id}
-                    type="button"
-                    className={`dashboard-alert-card dashboard-alert-card--${alert.tone}`}
+                    status={alert.status}
+                    caseReference={alert.caseReference}
+                    daysRemaining={getDaysRemaining(alert.prescriptionEndDate ?? null)}
                     onClick={() => navigate(alert.to.pathname)}
-                  >
-                    <div className="dashboard-alert-card__header">
-                      <div>
-                        <strong className="dashboard-alert-card__reference">
-                          {alert.caseReference}
-                        </strong>
-                        <p className="dashboard-alert-card__title">{alert.title}</p>
-                      </div>
-                      <شارة_الحالة status={alert.status} />
-                    </div>
-                    <p className="dashboard-alert-card__description">{alert.description}</p>
-                    <div className="dashboard-alert-card__meta">
-                      <span>{alert.remainingLabel}</span>
-                      <span>تاريخ السقوط: {alert.dueDateLabel}</span>
-                      <span>{alert.accessLabel}</span>
-                    </div>
-                  </button>
+                  />
                 ))}
-              </div>
-            )}
-          </section>
-
-          {role === 'CLERK' && (
-            <section className="card dashboard-panel">
-              <div className="card-header dashboard-panel__header">
-                <div>
-                  <div className="card-title">اختصارات تشغيلية</div>
-                  <div className="card-subtitle">
-                    مهام يومية سريعة لمباشرة التسجيل والبحث والطباعة دون الدخول في إجراء قضائي.
+                {(counts.ACTIVE || 0) > 0 && (
+                  <div className="ds-safe-summary mt-1">
+                    <span>✓</span>
+                    <span>{counts.ACTIVE} ملف آمن</span>
                   </div>
-                </div>
-              </div>
+                )}
+              </>
+            )}
+          </div>
 
-              <div className="dashboard-shortcuts">
-                <button type="button" className="dashboard-shortcut" onClick={() => navigate('/إنشاء-قضية')}>
+          {/* Crime type bar chart */}
+          <div className="ds-card">
+            <div className="ds-card-header">
+              <div>
+                <div className="ds-card-title">توزيع حسب نوع الجريمة</div>
+                <div className="ds-card-subtitle">انقر على الشريط للانتقال إلى الملفات المصفّاة</div>
+              </div>
+            </div>
+            {CRIME_TYPES.map((ct) => (
+              <button
+                key={ct}
+                type="button"
+                style={{ display: 'contents', background: 'none', border: 'none', cursor: 'pointer' }}
+                onClick={() => navigate('/القضايا', { state: { crimeTypeFilter: ct } })}
+              >
+                <div className="ds-bar-chart-row">
+                  <span className="ds-bar-chart-label">{CRIME_TYPE_LABELS[ct]}</span>
+                  <div className="ds-bar-chart-bar">
+                    <div
+                      className="ds-bar-chart-fill"
+                      style={{ width: `${((crimeTypeCounts[ct] ?? 0) / maxCrimeCount) * 100}%` }}
+                    />
+                  </div>
+                  <span className="ds-bar-chart-count">{crimeTypeCounts[ct] ?? 0}</span>
+                </div>
+              </button>
+            ))}
+
+            {role === 'CLERK' && (
+              <div className="ds-shortcut-grid">
+                <button type="button" className="ds-shortcut" onClick={() => navigate('/إنشاء-قضية')}>
                   <strong>تسجيل ملف جديد</strong>
-                  <span>فتح نموذج الإنشاء مباشرة</span>
+                  <span>فتح نموذج الإنشاء</span>
                 </button>
-                <button type="button" className="dashboard-shortcut" onClick={() => navigate('/القضايا')}>
+                <button type="button" className="ds-shortcut" onClick={() => navigate('/القضايا')}>
                   <strong>بحث واستعراض</strong>
-                  <span>تصفية القضايا حسب الحالة أو رقم الملف</span>
+                  <span>تصفية القضايا</span>
                 </button>
                 {nearestPrintableCase?.id && (
                   <button
                     type="button"
-                    className="dashboard-shortcut"
+                    className="ds-shortcut"
                     onClick={() => navigate(`/القضايا/${nearestPrintableCase.id}/طباعة`)}
                   >
-                    <strong>طباعة ملف قريب الأجل</strong>
-                    <span>فتح صفحة الطباعة للملف الأقرب انتهاءً</span>
+                    <strong>طباعة أقرب ملف</strong>
+                    <span>الأقرب انتهاءً</span>
                   </button>
                 )}
               </div>
-            </section>
-          )}
+            )}
+          </div>
         </div>
 
-        <div className="dashboard-grid__side">
-          <section className="card dashboard-panel">
-            <div className="card-header dashboard-panel__header">
+        {/* RIGHT COL — donut chart + nearest expiry table */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+          {/* Donut chart */}
+          <div className="ds-card">
+            <div className="ds-card-header">
               <div>
-                <div className="card-title">حالات التقادم بالألوان</div>
-                <div className="card-subtitle">
-                  تصنيف موحد بين لوحة التحكم وملفات القضايا وفق منطق الأحمر / الأصفر / الأخضر.
-                </div>
+                <div className="ds-card-title">توزيع الحالات</div>
+                <div className="ds-card-subtitle">توزيع {totalCases} ملف حسب حالة التقادم</div>
               </div>
             </div>
-
-            <div className="dashboard-status-cards">
-              {STATUS_ORDER.map((statusKey) => (
-                <button
-                  key={statusKey}
-                  type="button"
-                  className={`dashboard-status-card ${STATUS_CARD_CLASS[statusKey]}`}
-                  onClick={() => navigate('/القضايا', { state: { statusFilter: statusKey } })}
-                >
-                  <span className="dashboard-status-card__label">{getStatusLabel(statusKey)}</span>
-                  <strong className="dashboard-status-card__count">{counts[statusKey] ?? 0}</strong>
-                  <span className="dashboard-status-card__hint">
-                    {getStatusDescription(statusKey)}
-                  </span>
-                </button>
-              ))}
+            <div className="ds-donut-container">
+              <Doughnut data={donutData} options={donutOptions} />
             </div>
-          </section>
+            {/* Legend */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px', justifyContent: 'center' }}>
+              {STATUS_ORDER.filter((k) => k !== 'NON_PRESCRIPTIBLE').map((k) => (
+                <span key={k} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#6b7280' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: donutColors[k], display: 'inline-block' }} />
+                  {getStatusLabel(k)} ({counts[k] ?? 0})
+                </span>
+              ))}
+              {(counts.NON_PRESCRIPTIBLE ?? 0) > 0 && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#6b7280' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#1a6b9e', display: 'inline-block' }} />
+                  {getStatusLabel('NON_PRESCRIPTIBLE')} ({counts.NON_PRESCRIPTIBLE})
+                </span>
+              )}
+            </div>
+          </div>
 
-          <section className="card dashboard-panel">
-            <div className="card-header dashboard-panel__header">
+          {/* Nearest expiry table */}
+          <div className="ds-card">
+            <div className="ds-card-header">
               <div>
-                <div className="card-title">توزيع حسب نوع الجريمة</div>
-                <div className="card-subtitle">
-                  انتقال سريع إلى السجل المصفّى وفق التكييف الجزائي.
-                </div>
+                <div className="ds-card-title">أقرب الملفات انتهاءً</div>
+                <div className="ds-card-subtitle">أبرز 5 ملفات بحسب تاريخ السقوط</div>
               </div>
+              <button
+                type="button"
+                className="ds-link-btn"
+                onClick={() => navigate('/القضايا')}
+              >
+                عرض الكل
+              </button>
             </div>
-
-            <div className="dashboard-crime-grid">
-              {CRIME_TYPES.map((crimeType) => (
-                <button
-                  key={crimeType}
-                  type="button"
-                  className="dashboard-crime-card"
-                  onClick={() =>
-                    navigate('/القضايا', { state: { crimeTypeFilter: crimeType } })
-                  }
-                >
-                  <span>{CRIME_TYPE_LABELS[crimeType]}</span>
-                  <strong>{crimeTypeCounts[crimeType] ?? 0}</strong>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="card dashboard-panel">
-            <div className="card-header dashboard-panel__header">
-              <div>
-                <div className="card-title">أقرب الملفات انتهاءً</div>
-                <div className="card-subtitle">
-                  مراجعة سريعة للحالات الأقرب إلى تاريخ السقوط مع نفس منطق الألوان.
-                </div>
+            {nearestFive.length === 0 ? (
+              <p className="muted" style={{ fontSize: '13px', padding: '8px 0' }}>لا توجد ملفات ذات أجل محدد.</p>
+            ) : (
+              <div className="ds-table-wrapper">
+                <table className="ds-table">
+                  <thead>
+                    <tr>
+                      <th>الملف</th>
+                      <th>الأجل المتبقي</th>
+                      <th>الحالة</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {nearestFive.map((c) => (
+                      <tr key={c.id} onClick={() => navigate(`/القضايا/${c.id}`)} style={{ cursor: 'pointer' }}>
+                        <td><strong>{c.caseReference}</strong></td>
+                        <td style={{ fontSize: '12px' }}>
+                          {formatRemainingLabel(getDaysRemaining(c.prescriptionEndDate), c.status)}
+                        </td>
+                        <td><StatusBadge status={c.status} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
+            )}
+          </div>
 
-            <div className="dashboard-compact-list">
-              {allCases.slice(0, 5).map((caseData) => (
-                <button
-                  key={caseData.id}
-                  type="button"
-                  className="dashboard-compact-list__item"
-                  onClick={() => navigate(`/القضايا/${caseData.id}`)}
-                >
-                  <div>
-                    <strong>{caseData.caseReference}</strong>
-                    <p className="dashboard-compact-list__meta">
-                      {formatRemainingLabel(
-                        getDaysRemaining(caseData.prescriptionEndDate),
-                        caseData.status,
-                      )}
-                    </p>
-                  </div>
-                  <شارة_الحالة status={caseData.status} />
-                </button>
-              ))}
-            </div>
-          </section>
         </div>
       </div>
     </div>

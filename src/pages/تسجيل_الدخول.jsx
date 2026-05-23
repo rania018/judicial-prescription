@@ -8,22 +8,44 @@ const TEST_ACCOUNTS = [
   {
     email: 'clerk@test.com',
     role: 'أمين الضبط',
-    desc: 'إدخال بيانات القضية لأول مرة واستخراج بطاقة المعلومات عند الحاجة',
+    badge: 'تسجيل',
+    badgeClass: 'login-badge--violet',
   },
   {
     email: 'judge@test.com',
     role: 'قاضٍ',
-    desc: 'الاطلاع والتصرف في الملفات المسندة إليه حصراً',
+    badge: 'اطلاع',
+    badgeClass: 'login-badge--amber',
   },
   {
     email: 'prosecutor@test.com',
     role: 'وكيل الجمهورية',
-    desc: 'اطلاع رقابي على قضاة المحكمة والتصرف الكامل في ملفاته الخاصة',
+    badge: 'رقابة',
+    badgeClass: 'login-badge--red',
   },
   {
     email: 'attorney@test.com',
     role: 'النائب العام',
-    desc: 'اطلاع شامل على قضاة المجلس والتصرف الكامل في ملفاته الخاصة',
+    badge: 'اطلاع',
+    badgeClass: 'login-badge--green',
+  },
+]
+
+const HERO_FEATURES = [
+  {
+    title: 'تنبيهات الأجل الحرج',
+    desc: 'تصنيف أحمر / أصفر / أخضر بصياغة قضائية واضحة ومباشرة',
+    dotClass: 'login-feature-dot--red',
+  },
+  {
+    title: 'صلاحيات محددة لكل دور',
+    desc: 'أمين الضبط — قاضٍ — وكيل الجمهورية — النائب العام',
+    dotClass: 'login-feature-dot--green',
+  },
+  {
+    title: 'لوحة تحكم تحليلية',
+    desc: 'رسوم بيانية ومؤشرات أداء فورية لمتابعة القضايا',
+    dotClass: 'login-feature-dot--blue',
   },
 ]
 
@@ -70,34 +92,26 @@ export default function تسجيل_الدخول() {
           <span className="login-hero__badge">منصة قضائية داخلية</span>
           <h1 className="login-hero__title">نظام متابعة آجال التقادم</h1>
           <p className="login-hero__text">
-            دخول موحّد للجهات القضائية عبر واجهة عربية واضحة، مع تنبيهات مرئية تُسهّل متابعة
-            الملفات الحساسة وفق الصلاحيات الممنوحة لكل دور.
+            منصة موحدة للجهات القضائية لمتابعة آجال التقادم وإدارة الملفات الجزائرية بدقة وكفاءة، مع تنبيهات فورية وصلاحيات محددة لكل دور.
           </p>
 
           <div className="login-hero__features">
-            <div className="login-hero__feature">
-              <strong>متابعة حسب الدور</strong>
-              <span>أمين الضبط، قاضٍ، وكيل الجمهورية، والنائب العام.</span>
-            </div>
-            <div className="login-hero__feature">
-              <strong>تنبيهات الأعمال الحرجة</strong>
-              <span>تصنيف أحمر/أصفر/أخضر بصياغة قضائية واضحة.</span>
-            </div>
-            <div className="login-hero__feature">
-              <strong>تجربة عربية محسّنة</strong>
-              <span>تصميم RTL واضح مع معالجة سلسة لحالات التحميل والأخطاء.</span>
-            </div>
+            {HERO_FEATURES.map((feat) => (
+              <div key={feat.title} className="login-hero__feature">
+                <div className="login-hero__feature-header">
+                  <strong className="login-hero__feature-title">{feat.title}</strong>
+                  <span className={`login-feature-dot ${feat.dotClass}`} />
+                </div>
+                <span className="login-hero__feature-desc">{feat.desc}</span>
+              </div>
+            ))}
           </div>
         </section>
 
-        <div className="card login-card login-card--enhanced">
+        <div className="login-card login-card--enhanced">
           <div className="login-card__header">
-            <div>
-              <h2 className="login-title">تسجيل الدخول الآمن</h2>
-              <p className="login-subtitle">
-                أدخل بيانات الاعتماد للوصول إلى مركز المتابعة والتنبيهات.
-              </p>
-            </div>
+            <h2 className="login-title">تسجيل الدخول الآمن</h2>
+            <p className="login-subtitle">أدخل بيانات اعتماد الجهة القضائية للمتابعة</p>
             {from !== '/' && (
               <span className="login-return-chip">ستُعاد تلقائياً إلى الصفحة المطلوبة فور تسجيل الدخول</span>
             )}
@@ -106,7 +120,7 @@ export default function تسجيل_الدخول() {
           <form onSubmit={handleSubmit} className="login-form" aria-busy={loading}>
             <div className="form-field">
               <label className="form-label" htmlFor="email">
-                البريد الإلكتروني
+                البريد الإلكتروني المؤسسي
               </label>
               <input
                 id="email"
@@ -132,7 +146,7 @@ export default function تسجيل_الدخول() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="current-password"
-                  placeholder="أدخل كلمة المرور"
+                  placeholder="••••••••"
                   required
                 />
                 <button
@@ -159,17 +173,19 @@ export default function تسجيل_الدخول() {
                     <span>جارٍ التحقق من الهوية...</span>
                   </>
                 ) : (
-                  'دخول إلى النظام'
+                  <>
+                    <span className="login-submit-icon">🔒</span>
+                    دخول إلى النظام
+                  </>
                 )}
               </button>
             </div>
           </form>
 
           <div className="login-test-accounts">
-            <div className="login-test-accounts-title">حسابات تجريبية للدخول السريع</div>
-            <p className="login-test-accounts-note muted">
-              للوصول السريع في العرض التجريبي، اختر أحد الحسابات التالية. كلمة المرور الافتراضية لجميعها
-              هي: <strong>{TEST_PASSWORD}</strong>
+            <div className="login-test-accounts-title">حسابات تجريبية للعرض السريع</div>
+            <p className="login-test-accounts-note">
+              اختر حسابًا للدخول الفوري — كلمة المرور: <strong>{TEST_PASSWORD}</strong>
             </p>
             <ul className="login-test-accounts-list">
               {TEST_ACCOUNTS.map((account) => (
@@ -179,9 +195,9 @@ export default function تسجيل_الدخول() {
                     className="login-test-account-item"
                     onClick={() => fillTestAccount(account)}
                   >
-                    <span className="login-test-account-email">{account.email}</span>
                     <span className="login-test-account-role">{account.role}</span>
-                    <span className="muted">{account.desc}</span>
+                    <span className="login-test-account-email">{account.email}</span>
+                    <span className={`login-test-account-badge ${account.badgeClass}`}>{account.badge}</span>
                   </button>
                 </li>
               ))}
