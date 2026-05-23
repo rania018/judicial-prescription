@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import dayjs from 'dayjs'
+import { NON_PRESCRIPTIBLE_CATEGORIES } from '../utils/statusHelpers'
 
 const CRIME_TYPES = [
   { value: 'FELONY', label: 'جناية' },
@@ -42,6 +43,9 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
   const [minorBirthDate, setMinorBirthDate] = useState('')
   const [severityLevel, setSeverityLevel] = useState('')
   const [customPenaltyDuration, setCustomPenaltyDuration] = useState(1)
+  const [sentenceYears, setSentenceYears] = useState(5)
+  const [appearanceDate, setAppearanceDate] = useState('')
+  const [nonPrescriptibleCategory, setNonPrescriptibleCategory] = useState('')
   const [judicialAuthority, setJudicialAuthority] = useState('COURT')
   const [judicialOfficer, setJudicialOfficer] = useState('PROSECUTOR')
   const [crimeDate, setCrimeDate] = useState('')
@@ -59,31 +63,60 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
     if (trackType === 'PENALTY_EXECUTION') {
       setIsMinor(false)
       setMinorBirthDate('')
+      setAppearanceDate('')
       setSeverityLevel((prev) =>
         prev === 'HIDDEN' || prev === 'EQUAL_TO_SENTENCE' ? '' : prev,
       )
     }
   }, [trackType])
 
+  // Reset appearance date when severity level changes away from HIDDEN
+  useEffect(() => {
+    if (severityLevel !== 'HIDDEN') {
+      setAppearanceDate('')
+    }
+  }, [severityLevel])
+
+  // Reset non-prescriptible category when crime type changes away from EXEMPTED
+  useEffect(() => {
+    if (crimeType !== 'EXEMPTED') {
+      setNonPrescriptibleCategory('')
+    }
+  }, [crimeType])
+
   const today = dayjs().format('YYYY-MM-DD')
 
-  // In PENALTY_EXECUTION mode, isMinor and HIDDEN/EQUAL_TO_SENTENCE are not applicable
+  // In PENALTY_EXECUTION mode, isMinor and HIDDEN are not applicable
   const isMinorApplicable = trackType === 'PROSECUTION'
+  const isHiddenApplicable = trackType === 'PROSECUTION' && crimeType !== 'VIOLATION' && crimeType !== 'EXEMPTED'
+  const isAppearanceDateRequired = severityLevel === 'HIDDEN' && isHiddenApplicable
+
+  // Severity level options by track and crime type
+  const showSeveritySection = trackType === 'PROSECUTION' && crimeType !== 'VIOLATION' && crimeType !== 'EXEMPTED'
+  const isCustomPenaltyRequired = severityLevel === 'CUSTOM' && crimeType === 'FELONY'
+
+  // Sentence years for PENALTY_EXECUTION + AGGRAVATED_MISDEMEANOR
+  const showSentenceYears = trackType === 'PENALTY_EXECUTION' && crimeType === 'AGGRAVATED_MISDEMEANOR'
+
   // Validation logic
-  const isSeverityLevelRequired = crimeType !== 'VIOLATION' && crimeType !== 'EXEMPTED'
-  const isCustomPenaltyRequired = severityLevel === 'CUSTOM'
-  
+  const isSeverityLevelRequired = showSeveritySection && crimeType === 'FELONY'
+
+  const isNonPrescriptibleCategoryRequired = crimeType === 'EXEMPTED'
+
   const isValid =
     caseReference.trim().length > 0 &&
     trackType &&
     crimeType &&
-    (!isSeverityLevelRequired || (severityLevel && 
+    (!isSeverityLevelRequired || (severityLevel &&
       (severityLevel !== 'CUSTOM' || (customPenaltyDuration && customPenaltyDuration >= 1 && customPenaltyDuration <= 30)))) &&
+    (!isNonPrescriptibleCategoryRequired || nonPrescriptibleCategory) &&
     judicialAuthority &&
     judicialOfficer &&
-    crimeDate !== '' && 
+    crimeDate !== '' &&
     crimeDate <= today &&
-    (!isMinorApplicable || !isMinor || (isMinor && minorBirthDate && minorBirthDate <= crimeDate))
+    (!isMinorApplicable || !isMinor || (isMinor && minorBirthDate && minorBirthDate <= crimeDate)) &&
+    (!isAppearanceDateRequired || (appearanceDate && appearanceDate >= crimeDate && appearanceDate <= today)) &&
+    (!showSentenceYears || (sentenceYears && sentenceYears >= 5 && sentenceYears <= 20))
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -91,6 +124,7 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
 
     const crimeDateObj = new Date(crimeDate)
     const minorBirthDateObj = isMinor ? new Date(minorBirthDate) : null
+    const appearanceDateObj = isAppearanceDateRequired && appearanceDate ? new Date(appearanceDate) : null
 
     onSubmit({
       caseReference: caseReference.trim(),
@@ -98,8 +132,11 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
       crimeType,
       isMinor: isMinorApplicable ? isMinor : false,
       minorBirthDate: isMinorApplicable ? minorBirthDateObj : null,
-      ...(isSeverityLevelRequired && { severityLevel }),
+      ...(showSeveritySection && { severityLevel }),
       ...(isCustomPenaltyRequired && { customPenaltyDuration }),
+      ...(showSentenceYears && { sentenceYears }),
+      ...(appearanceDateObj && { appearanceDate: appearanceDateObj }),
+      ...(nonPrescriptibleCategory && { nonPrescriptibleCategory }),
       judicialAuthority,
       judicialOfficer,
       crimeDate: crimeDateObj,
@@ -121,7 +158,7 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
             onChange={(e) => setCaseReference(e.target.value)}
             required
           />
-          <p className="muted">الرقم المرجعي للملف الجزائي كما هو مُدوَّن في السجل الرسمي.</p>
+          <p className="muted">المعرّف الفريد للملف — يربط السجل الرقمي بالنسخة الورقية.</p>
         </div>
 
         <div className="form-field">
@@ -143,8 +180,8 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
           </select>
           <p className="muted">
             {trackType === 'PENALTY_EXECUTION'
-              ? 'مرحلة تنفيذ العقوبة: يبدأ الأجل من تاريخ الحكم النهائي.'
-              : 'مرحلة المتابعة الجزائية: يبدأ الأجل من تاريخ اقتراف الجريمة.'}
+              ? 'تقادم العقوبة: يبدأ الأجل من تاريخ الحكم النهائي البات. لا تنطبق الجرائم الخفية أو قضايا الأحداث على هذه المرحلة.'
+              : 'تقادم الدعوى العمومية: يبدأ الأجل من تاريخ اقتراف الجريمة.'}
           </p>
         </div>
 
@@ -158,7 +195,6 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
             value={crimeType}
             onChange={(e) => {
               setCrimeType(e.target.value)
-              // Reset severity level when changing crime type
               if (e.target.value === 'VIOLATION' || e.target.value === 'EXEMPTED') {
                 setSeverityLevel('')
               }
@@ -171,15 +207,81 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
               </option>
             ))}
           </select>
+          {crimeType === 'FELONY' && trackType === 'PROSECUTION' && (
+            <p className="muted">الجناية: الأصل 15 سنة. استثناء: قوانين خاصة تُحدد 20 سنة (سجن مؤقت) أو 30 سنة (مؤبد/إعدام).</p>
+          )}
+          {crimeType === 'FELONY' && trackType === 'PENALTY_EXECUTION' && (
+            <p className="muted">تقادم عقوبة الجناية: 20 سنة تحتسب من تاريخ الحكم النهائي.</p>
+          )}
+          {crimeType === 'SIMPLE_MISDEMEANOR' && trackType === 'PROSECUTION' && (
+            <p className="muted">جنحة بسيطة: مدة التقادم 5 سنوات (عقوبتها تساوي أو تقل عن 5 سنوات).</p>
+          )}
+          {crimeType === 'AGGRAVATED_MISDEMEANOR' && trackType === 'PROSECUTION' && (
+            <p className="muted">جنحة مشددة: مدة التقادم 10 سنوات (عقوبتها تفوق 5 سنوات).</p>
+          )}
+          {crimeType === 'AGGRAVATED_MISDEMEANOR' && trackType === 'PENALTY_EXECUTION' && (
+            <p className="muted">تقادم عقوبة الجنحة المشددة: مساوية لمدة العقوبة المحكوم بها (5–20 سنة).</p>
+          )}
+          {crimeType === 'SIMPLE_MISDEMEANOR' && trackType === 'PENALTY_EXECUTION' && (
+            <p className="muted">تقادم عقوبة الجنحة البسيطة: 5 سنوات.</p>
+          )}
+          {crimeType === 'VIOLATION' && (
+            <p className="muted">المخالفة: مدة التقادم سنتان تلقائياً.</p>
+          )}
           {crimeType === 'EXEMPTED' && (
-            <p className="muted">جرائم لا تسقط بالتقادم: لا يُحتسب أجل التقادم لهذه الجريمة.</p>
+            <p className="muted">جرائم لا تسقط بالتقادم: يُعطَّل حساب أي أجل تقادم لهذه الجريمة.</p>
           )}
         </div>
 
+        {/* Non-prescriptible category selector */}
+        {crimeType === 'EXEMPTED' && (
+          <div className="form-field">
+            <label className="form-label" htmlFor="nonPrescriptibleCategory">
+              فئة الجريمة غير القابلة للتقادم
+            </label>
+            <select
+              id="nonPrescriptibleCategory"
+              className="form-select"
+              value={nonPrescriptibleCategory}
+              onChange={(e) => setNonPrescriptibleCategory(e.target.value)}
+              required
+            >
+              <option value="">— اختر الفئة —</option>
+              {NON_PRESCRIPTIBLE_CATEGORIES.map((cat) => (
+                <option key={cat.value} value={cat.value}>
+                  {cat.label}
+                </option>
+              ))}
+            </select>
+            <p className="muted">حدد الفئة القانونية التي تندرج ضمنها هذه الجريمة (الجرائم الخمس المحددة حصراً).</p>
+          </div>
+        )}
+
+        {/* Sentence years for PENALTY_EXECUTION + AGGRAVATED_MISDEMEANOR */}
+        {showSentenceYears && (
+          <div className="form-field">
+            <label className="form-label" htmlFor="sentenceYears">
+              مدة الحكم القضائي (بالسنوات)
+            </label>
+            <input
+              id="sentenceYears"
+              type="number"
+              min="5"
+              max="20"
+              className="form-input"
+              value={sentenceYears}
+              onChange={(e) => setSentenceYears(parseInt(e.target.value))}
+              required
+            />
+            <p className="muted">أدخل مدة الحكم المقضي به (من 5 إلى 20 سنة) — تُساوي مدة تقادم العقوبة.</p>
+          </div>
+        )}
+
+        {/* Minor case (PROSECUTION only) */}
         {trackType === 'PROSECUTION' && (
           <div className="form-field">
             <label className="form-label" htmlFor="isMinor">
-              قضية الأحداث
+              قضية الحدث
             </label>
             <label className="form-checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
               <input
@@ -191,7 +293,7 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
                   if (!e.target.checked) setMinorBirthDate('')
                 }}
               />
-              <span>القضية تتعلق بحدث (قاصر) — يبدأ حساب التقادم عند بلوغه 18 سنة</span>
+              <span>القضية تتعلق بحدث (قاصر) — يُجمَّد الحساب حتى بلوغه سن الرشد (19 سنة)</span>
             </label>
           </div>
         )}
@@ -214,66 +316,58 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
           </div>
         )}
 
-        {isSeverityLevelRequired && (
+        {/* Severity level section — PROSECUTION only */}
+        {showSeveritySection && (
           <div className="form-field">
             <label className="form-label" htmlFor="severityLevel">
-              الجرائم الخفية والمخفية / تخصيص الأجل
+              {crimeType === 'FELONY' ? 'الاستثناءات القانونية للجناية' : 'الجرائم الخفية والمخفية'}
             </label>
             <div className="form-checkbox-group">
-              {trackType === 'PROSECUTION' && (
-                <label className="form-checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                  <input
-                    id="hidden"
-                    type="checkbox"
-                    checked={severityLevel === 'HIDDEN'}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSeverityLevel('HIDDEN')
-                      } else if (severityLevel === 'HIDDEN') {
-                        setSeverityLevel('')
-                      }
-                    }}
-                  />
-                  <span>جريمة خفية / مخفية (يبدأ الأجل من تاريخ اكتشاف الجريمة)</span>
-                </label>
-              )}
-              
-              {trackType === 'PROSECUTION' && (
+              {/* HIDDEN — for all eligible prosecution crime types */}
+              <label className="form-checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                <input
+                  id="hidden"
+                  type="checkbox"
+                  checked={severityLevel === 'HIDDEN'}
+                  onChange={(e) => {
+                    setSeverityLevel(e.target.checked ? 'HIDDEN' : '')
+                  }}
+                />
+                <span>جريمة خفية / مخفية — يُدخَل تاريخ الظهور للعلن لضبط المدة المتبقية</span>
+              </label>
+
+              {/* EQUAL_TO_SENTENCE — FELONY only */}
+              {crimeType === 'FELONY' && (
                 <label className="form-checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
                   <input
                     id="equal_to_sentence"
                     type="checkbox"
                     checked={severityLevel === 'EQUAL_TO_SENTENCE'}
                     onChange={(e) => {
-                      if (e.target.checked) {
-                        setSeverityLevel('EQUAL_TO_SENTENCE')
-                      } else if (severityLevel === 'EQUAL_TO_SENTENCE') {
-                        setSeverityLevel('')
-                      }
+                      setSeverityLevel(e.target.checked ? 'EQUAL_TO_SENTENCE' : '')
                     }}
                   />
-                  <span>مدة التقادم مساوية لمدة العقوبة</span>
+                  <span>عقوبة مؤبد أو إعدام — مدة التقادم 30 سنة</span>
                 </label>
               )}
-              
-              <label className="form-checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                <input
-                  id="custom"
-                  type="checkbox"
-                  checked={severityLevel === 'CUSTOM'}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSeverityLevel('CUSTOM')
-                    } else if (severityLevel === 'CUSTOM') {
-                      setSeverityLevel('')
-                    }
-                  }}
-                />
-                <span>مدة تقادم خاصة (مخصصة بموجب نص قانوني)</span>
-              </label>
+
+              {/* CUSTOM — FELONY only */}
+              {crimeType === 'FELONY' && (
+                <label className="form-checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    id="custom"
+                    type="checkbox"
+                    checked={severityLevel === 'CUSTOM'}
+                    onChange={(e) => {
+                      setSeverityLevel(e.target.checked ? 'CUSTOM' : '')
+                    }}
+                  />
+                  <span>قانون خاص — مدة التقادم 20 سنة أو مدة مخصصة</span>
+                </label>
+              )}
             </div>
-            
-            {severityLevel === 'CUSTOM' && (
+
+            {severityLevel === 'CUSTOM' && crimeType === 'FELONY' && (
               <div className="mt-2">
                 <label className="form-label" htmlFor="customPenaltyDuration">
                   مدة التقادم الخاصة (بالسنوات)
@@ -288,9 +382,37 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
                   onChange={(e) => setCustomPenaltyDuration(parseInt(e.target.value))}
                   required
                 />
-                <p className="muted">أدخل المدة المنصوص عليها قانوناً لأجل تقادم هذه الجريمة.</p>
+                <p className="muted">أدخل المدة المنصوص عليها في القانون الخاص (مثلاً: 20 سنة).</p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Appearance date — hidden crimes in PROSECUTION track only */}
+        {isAppearanceDateRequired && (
+          <div className="form-field">
+            <label className="form-label" htmlFor="appearanceDate">
+              تاريخ الظهور للعلن
+            </label>
+            <input
+              id="appearanceDate"
+              type="date"
+              className="form-input"
+              min={crimeDate || undefined}
+              max={today}
+              value={appearanceDate}
+              onChange={(e) => setAppearanceDate(e.target.value)}
+              required
+            />
+            <p className="muted">
+              التاريخ الذي كُشف فيه عن الجريمة للعموم. يجب أن يكون بعد تاريخ الاقتراف وليس مستقبلياً.
+              {crimeDate && appearanceDate && appearanceDate >= crimeDate && (
+                <span style={{ display: 'block', marginTop: '0.25rem', fontWeight: 600 }}>
+                  المدة الفاصلة بين الاقتراف والظهور:{' '}
+                  {Math.floor((new Date(appearanceDate) - new Date(crimeDate)) / (365.25 * 24 * 3600 * 1000))} سنة.
+                </span>
+              )}
+            </p>
           </div>
         )}
 
@@ -335,7 +457,7 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
         <div className="form-field">
           <label className="form-label" htmlFor="crimeDate">
             {trackType === 'PENALTY_EXECUTION'
-              ? 'تاريخ الحكم النهائي (بدء أجل تنفيذ العقوبة)'
+              ? 'تاريخ الحكم النهائي الحائز لقوة الشيء المقضي فيه'
               : 'تاريخ اقتراف الجريمة'}
           </label>
           <input
@@ -344,13 +466,19 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
             className="form-input"
             max={today}
             value={crimeDate}
-            onChange={(e) => setCrimeDate(e.target.value)}
+            onChange={(e) => {
+              setCrimeDate(e.target.value)
+              // Reset appearance date if it's now before the new crime date
+              if (appearanceDate && appearanceDate < e.target.value) {
+                setAppearanceDate('')
+              }
+            }}
             required
           />
           <p className="muted">
             {trackType === 'PENALTY_EXECUTION'
-              ? 'تاريخ الحكم النهائي البات — هذا هو تاريخ بدء احتساب أجل التقادم في مرحلة التنفيذ.'
-              : 'لا يمكن اختيار تاريخ مستقبلي. هذا التاريخ يبدأ مؤقت التقادم.'}
+              ? 'تاريخ صدور الحكم النهائي البات — هذا هو نقطة الانطلاق القانونية لحساب تقادم العقوبة.'
+              : 'تاريخ وقوع الجريمة — نقطة الانطلاق الزمنية لحساب أجل التقادم.'}
           </p>
         </div>
       </div>

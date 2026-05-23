@@ -8,6 +8,7 @@ import {
   getInterruptionTypeLabel,
   getStatusLabel,
   getTrackTypeLabel,
+  getNonPrescriptibleCategoryLabel,
 } from '../utils/statusHelpers'
 
 function getPrintActionLabel(action) {
@@ -110,9 +111,27 @@ export default function طباعة_القضية() {
               <td>{caseData.judicialOfficer || '—'}</td>
             </tr>
             <tr>
-              <th>6) تاريخ اقتراف الجريمة / بدء السريان</th>
+              <th>6) {caseData.trackType === 'PENALTY_EXECUTION' ? 'تاريخ الحكم النهائي (بدء الأجل)' : 'تاريخ اقتراف الجريمة'}</th>
               <td>{formatArabicDate(caseData.crimeDate)}</td>
             </tr>
+            {caseData.appearanceDate && caseData.severityLevel === 'HIDDEN' && (
+              <tr>
+                <th>تاريخ الظهور للعلن</th>
+                <td>{formatArabicDate(caseData.appearanceDate)}</td>
+              </tr>
+            )}
+            {caseData.nonPrescriptibleCategory && caseData.crimeType === 'EXEMPTED' && (
+              <tr>
+                <th>فئة الجريمة غير القابلة للتقادم</th>
+                <td>{getNonPrescriptibleCategoryLabel(caseData.nonPrescriptibleCategory)}</td>
+              </tr>
+            )}
+            {caseData.sentenceYears && caseData.trackType === 'PENALTY_EXECUTION' && caseData.crimeType === 'AGGRAVATED_MISDEMEANOR' && (
+              <tr>
+                <th>مدة الحكم القضائي</th>
+                <td>{caseData.sentenceYears} سنة</td>
+              </tr>
+            )}
             <tr>
               <th>7) حالة التقادم</th>
               <td>{getStatusLabel(caseData.status)}</td>

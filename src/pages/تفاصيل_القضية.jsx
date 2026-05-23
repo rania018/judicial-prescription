@@ -13,6 +13,7 @@ import {
   getStatusDescription,
   getTrackTypeLabel,
   getSeverityLevelLabel,
+  getNonPrescriptibleCategoryLabel,
 } from '../utils/statusHelpers'
 import { canTakeJudicialActions } from '../utils/rbacHelper'
 import شارة_الحالة from '../components/شارة_الحالة.jsx'
@@ -161,13 +162,31 @@ export default function تفاصيل_القضية() {
               <span>{caseData.judicialOfficer}</span>
             </div>
             <div className="detail-row">
-              <strong>6) تاريخ اقتراف الجريمة / بدء السريان:</strong>
+              <strong>6) {caseData.trackType === 'PENALTY_EXECUTION' ? 'تاريخ الحكم النهائي (بدء الأجل):' : 'تاريخ اقتراف الجريمة:'}</strong>
               <span>{formatArabicDate(caseData.crimeDate)}</span>
             </div>
             {caseData.severityLevel && (
               <div className="detail-row">
                 <strong>تفصيل التكييف:</strong>
                 <span>{getSeverityLevelLabel(caseData.severityLevel)}</span>
+              </div>
+            )}
+            {caseData.appearanceDate && caseData.severityLevel === 'HIDDEN' && (
+              <div className="detail-row">
+                <strong>تاريخ الظهور للعلن:</strong>
+                <span>{formatArabicDate(caseData.appearanceDate)}</span>
+              </div>
+            )}
+            {caseData.nonPrescriptibleCategory && caseData.crimeType === 'EXEMPTED' && (
+              <div className="detail-row">
+                <strong>فئة الجريمة غير القابلة للتقادم:</strong>
+                <span>{getNonPrescriptibleCategoryLabel(caseData.nonPrescriptibleCategory)}</span>
+              </div>
+            )}
+            {caseData.sentenceYears && caseData.trackType === 'PENALTY_EXECUTION' && caseData.crimeType === 'AGGRAVATED_MISDEMEANOR' && (
+              <div className="detail-row">
+                <strong>مدة الحكم القضائي:</strong>
+                <span>{caseData.sentenceYears} سنة</span>
               </div>
             )}
           </div>
@@ -189,6 +208,26 @@ export default function تفاصيل_القضية() {
               <strong>8) تاريخ بدء الأجل:</strong>
               <span>{formatArabicDate(caseData.prescriptionStartDate)}</span>
             </div>
+            {caseData.appearanceDate && caseData.severityLevel === 'HIDDEN' && (() => {
+              const crimeD = caseData.crimeDate && (typeof caseData.crimeDate.toDate === 'function' ? caseData.crimeDate.toDate() : new Date(caseData.crimeDate))
+              const appearD = typeof caseData.appearanceDate.toDate === 'function' ? caseData.appearanceDate.toDate() : new Date(caseData.appearanceDate)
+              const elapsedYears = crimeD && appearD ? Math.floor((appearD - crimeD) / (365.25 * 24 * 3600 * 1000)) : null
+              if (elapsedYears === null) return null
+              const totalHiddenDuration = caseData.prescriptionEndDate && crimeD
+                ? Math.round((new Date(typeof caseData.prescriptionEndDate.toDate === 'function' ? caseData.prescriptionEndDate.toDate() : caseData.prescriptionEndDate) - crimeD) / (365.25 * 24 * 3600 * 1000))
+                : null
+              const remaining = totalHiddenDuration !== null ? totalHiddenDuration - elapsedYears : null
+              return (
+                <div className="detail-row" style={{ background: 'var(--color-surface-2, #f0f4ff)', borderRadius: '6px', padding: '0.5rem 0.75rem' }}>
+                  <strong>حساب الجريمة الخفية:</strong>
+                  <span className="muted" style={{ fontSize: '0.875rem' }}>
+                    {totalHiddenDuration !== null
+                      ? `المدة الكلية ${totalHiddenDuration} سنة − المدة الفاصلة (اقتراف→ظهور) ${elapsedYears} سنة = المتبقي ${remaining} سنة من تاريخ الظهور`
+                      : `المدة الفاصلة بين الاقتراف والظهور: ${elapsedYears} سنة`}
+                  </span>
+                </div>
+              )
+            })()}
             <div className="detail-row">
               <strong>9) تاريخ السقوط / انتهاء الأجل:</strong>
               <span>
