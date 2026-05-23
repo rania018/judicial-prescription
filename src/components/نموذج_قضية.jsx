@@ -107,11 +107,8 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
       setIndictmentBranch('')
       return
     }
-
-    if (!indictmentBranchGroup) {
-      setIndictmentBranchGroup(INDICTMENT_BRANCH_GROUPS[0]?.value || '')
-    }
-  }, [requiresIndictmentBranch, indictmentBranchGroup])
+    setIndictmentBranchGroup((prev) => prev || INDICTMENT_BRANCH_GROUPS[0]?.value || '')
+  }, [requiresIndictmentBranch])
 
   useEffect(() => {
     if (!requiresIndictmentBranch) return
@@ -120,10 +117,10 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
       setIndictmentBranch('')
       return
     }
-    if (!options.some((option) => option.value === indictmentBranch)) {
-      setIndictmentBranch(options[0].value)
-    }
-  }, [requiresIndictmentBranch, indictmentBranchGroup, indictmentBranch])
+    setIndictmentBranch((prev) =>
+      options.some((option) => option.value === prev) ? prev : options[0]?.value || '',
+    )
+  }, [requiresIndictmentBranch, indictmentBranchGroup])
 
   // Severity level options by track and crime type
   const showSeveritySection = trackType === 'PROSECUTION' && crimeType !== 'VIOLATION' && crimeType !== 'EXEMPTED'
