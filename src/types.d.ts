@@ -5,6 +5,9 @@ interface CaseData {
   crimeType: 'FELONY' | 'SIMPLE_MISDEMEANOR' | 'AGGRAVATED_MISDEMEANOR' | 'VIOLATION' | 'EXEMPTED'; // نوع الجريمة
   severityLevel?: 'HIDDEN' | 'EQUAL_TO_SENTENCE' | 'CUSTOM'; // درجة الجسامة
   customPenaltyDuration?: number;  // مدة تخصيص العقوبة (1-30 سنة)
+  sentenceYears?: number;          // مدة الحكم (للجنحة المشددة في التنفيذ، 5-20 سنة)
+  appearanceDate?: Date;           // تاريخ الظهور للعلن (للجرائم الخفية والمخفية)
+  nonPrescriptibleCategory?: string; // فئة جريمة لا تسقط بالتقادم
   judicialAuthority: string;       // الجهة القضائية
   judicialOfficer: string;         // الصفة القضائية
   crimeDate: Date;                 // تاريخ اقتراف الجريمة

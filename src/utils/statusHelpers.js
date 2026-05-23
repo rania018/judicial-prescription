@@ -32,6 +32,18 @@ export const SEVERITY_LEVEL_LABELS = {
   CUSTOM: 'مدة تقادم خاصة (مخصصة)',
 }
 
+export const NON_PRESCRIPTIBLE_CATEGORIES = [
+  { value: 'TERRORISM', label: 'الجرائم الإرهابية والتخريبية (جنايات وجنح)' },
+  { value: 'STATE_SECURITY', label: 'جنايات أمن الدولة' },
+  { value: 'ORGANIZED_CRIME', label: 'جرائم الجريمة المنظمة العابرة للحدود' },
+  { value: 'CORRUPTION', label: 'جرائم الفساد بكافة صورها' },
+  { value: 'EMBEZZLEMENT_ABROAD', label: 'جرائم اختلاس الأموال العمومية (مع تحويل العائدات للخارج)' },
+]
+
+export const NON_PRESCRIPTIBLE_CATEGORY_LABELS = Object.fromEntries(
+  NON_PRESCRIPTIBLE_CATEGORIES.map(({ value, label }) => [value, label]),
+)
+
 export const INTERRUPTION_TYPE_LABELS = {
   INVESTIGATION: 'إجراءات البحث والتحري (الضبطية)',
   PROSECUTION: 'إجراءات مباشرة الدعوى العمومية (النيابة)',
@@ -196,6 +208,10 @@ export function getActionTypeLabel(value) {
 
 export function getSeverityLevelLabel(value) {
   return SEVERITY_LEVEL_LABELS[value] ?? value
+}
+
+export function getNonPrescriptibleCategoryLabel(value) {
+  return NON_PRESCRIPTIBLE_CATEGORY_LABELS[value] ?? value
 }
 
 export function getInterruptionTypeLabel(value) {
