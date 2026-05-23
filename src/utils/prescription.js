@@ -252,9 +252,10 @@ export function formatArabicDate(timestampOrDate) {
 export const MS_PER_YEAR = 365.25 * 24 * 3600 * 1000
 
 /**
- * Compute the number of elapsed whole years between two dates.
+ * Compute the number of elapsed whole years between two dates (fractional years are truncated).
  * Accepts Date objects, Firestore Timestamps, or anything accepted by `new Date()`.
  * Returns null when either argument is absent or invalid.
+ * Returns a negative number when `to` precedes `from`.
  */
 export function yearsBetween(from, to) {
   const fromD = from && (typeof from.toDate === 'function' ? from.toDate() : new Date(from))

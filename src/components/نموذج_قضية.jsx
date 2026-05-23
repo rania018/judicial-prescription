@@ -278,7 +278,7 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
               max="20"
               className="form-input"
               value={sentenceYears}
-              onChange={(e) => setSentenceYears(parseInt(e.target.value))}
+              onChange={(e) => setSentenceYears(parseInt(e.target.value, 10))}
               required
             />
             <p className="muted">أدخل مدة الحكم المقضي به (من 5 إلى 20 سنة) — تُساوي مدة تقادم العقوبة.</p>
@@ -387,7 +387,7 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
                   max="30"
                   className="form-input"
                   value={customPenaltyDuration}
-                  onChange={(e) => setCustomPenaltyDuration(parseInt(e.target.value))}
+                  onChange={(e) => setCustomPenaltyDuration(parseInt(e.target.value, 10))}
                   required
                 />
                 <p className="muted">أدخل المدة المنصوص عليها في القانون الخاص (مثلاً: 20 سنة).</p>
