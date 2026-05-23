@@ -10,6 +10,8 @@ interface CaseData {
   nonPrescriptibleCategory?: string; // فئة جريمة لا تسقط بالتقادم
   judicialAuthority: string;       // الجهة القضائية
   judicialOfficer: string;         // الصفة القضائية
+  indictmentBranchGroup?: string;  // نافذة تفريع رئيس غرفة الاتهام
+  indictmentBranch?: string;       // نوع الملف داخل تفريع رئيس غرفة الاتهام
   crimeDate: Date;                 // تاريخ اقتراف الجريمة
   status: 'ACTIVE' | 'WARNING' | 'URGENT' | 'CRITICAL' | 'SUSPENDED' | 'EXPIRED' | 'NON_PRESCRIPTIBLE';
   createdBy: string;

@@ -1893,6 +1893,34 @@ tr:hover td {
   padding-top: 0.75rem;
 }
 
+.print-verification {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.print-qr-code {
+  width: 120px;
+  height: 120px;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 0.25rem;
+  background: #fff;
+}
+
+.print-qr-fallback {
+  min-width: 120px;
+  min-height: 120px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed #d1d5db;
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  text-align: center;
+}
+
 @media print {
   body {
     background-color: #ffffff;
@@ -1926,6 +1954,10 @@ tr:hover td {
   }
 
   .print-section {
+    page-break-inside: avoid;
+  }
+
+  .print-verification {
     page-break-inside: avoid;
   }
 }

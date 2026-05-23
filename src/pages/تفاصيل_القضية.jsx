@@ -10,6 +10,9 @@ import {
 import { formatArabicDate, getDaysRemaining, yearsBetween } from '../utils/prescription'
 import {
   getCrimeTypeLabel,
+  getJudicialAuthorityLabel,
+  getJudicialOfficerLabel,
+  getIndictmentBranchLabel,
   getStatusDescription,
   getTrackTypeLabel,
   getSeverityLevelLabel,
@@ -155,12 +158,18 @@ export default function تفاصيل_القضية() {
             </div>
             <div className="detail-row">
               <strong>4) الجهة القضائية:</strong>
-              <span>{caseData.judicialAuthority}</span>
+              <span>{getJudicialAuthorityLabel(caseData.judicialAuthority)}</span>
             </div>
             <div className="detail-row">
               <strong>5) الصفة القضائية:</strong>
-              <span>{caseData.judicialOfficer}</span>
+              <span>{getJudicialOfficerLabel(caseData.judicialOfficer)}</span>
             </div>
+            {caseData.indictmentBranch && (
+              <div className="detail-row">
+                <strong>تفريع رئيس غرفة الاتهام:</strong>
+                <span>{getIndictmentBranchLabel(caseData.indictmentBranch)}</span>
+              </div>
+            )}
             <div className="detail-row">
               <strong>6) {caseData.trackType === 'PENALTY_EXECUTION' ? 'تاريخ الحكم النهائي (بدء الأجل):' : 'تاريخ اقتراف الجريمة:'}</strong>
               <span>{formatArabicDate(caseData.crimeDate)}</span>

@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import QRCode from 'qrcode'
 import { useAuth } from '../context/AuthContext.jsx'
 import { getCaseById, listCaseActions } from '../services/caseService'
 import { formatArabicDate } from '../utils/prescription'
 import {
   getCrimeTypeLabel,
+  getJudicialAuthorityLabel,
+  getJudicialOfficerLabel,
+  getIndictmentBranchLabel,
   getInterruptionTypeLabel,
   getStatusLabel,
   getTrackTypeLabel,
@@ -30,12 +34,29 @@ function getPrintActionDetails(action) {
   return action.notes || 'استئناف سريان الأجل'
 }
 
+function formatDateForQR(value) {
+  if (!value) return null
+  const date = typeof value.toDate === 'function' ? value.toDate() : new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    // eslint-disable-next-line no-console
+    console.warn('Invalid date in QR verification payload:', value)
+    return null
+  }
+  return date.toISOString().slice(0, 10)
+}
+
+function buildVerificationRoute(caseId, fallbackId) {
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  return `${origin}/القضايا/${caseId || fallbackId}`
+}
+
 export default function طباعة_القضية() {
   const { caseId } = useParams()
   const { user, role, userProfile } = useAuth()
   const [caseData, setCaseData] = useState(null)
   const [actions, setActions] = useState([])
   const [loading, setLoading] = useState(true)
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState('')
 
   useEffect(() => {
     const load = async () => {
@@ -63,6 +84,41 @@ export default function طباعة_القضية() {
     load()
   }, [caseId, role, user?.uid, userProfile])
 
+  useEffect(() => {
+    const generateQrCode = async () => {
+      if (!caseData) {
+        setQrCodeDataUrl('')
+        return
+      }
+
+      const verificationRoute = buildVerificationRoute(caseData.id, caseId)
+
+      const verificationPayload = JSON.stringify({
+        r: caseData.caseReference,
+        i: caseData.id || caseId,
+        t: caseData.trackType,
+        s: caseData.status,
+        e: formatDateForQR(caseData.prescriptionEndDate),
+        v: verificationRoute,
+      })
+
+      try {
+        const dataUrl = await QRCode.toDataURL(verificationPayload, {
+          width: 160,
+          margin: 1,
+          errorCorrectionLevel: 'M',
+        })
+        setQrCodeDataUrl(dataUrl)
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('QR generation failed:', error)
+        setQrCodeDataUrl('')
+      }
+    }
+
+    generateQrCode()
+  }, [caseData, caseId])
+
   if (loading) {
     return (
       <div className="print-layout">
@@ -79,11 +135,13 @@ export default function طباعة_القضية() {
     )
   }
 
+  const verificationRoute = buildVerificationRoute(caseData.id, caseId)
+
   return (
     <div className="print-layout">
       <header className="print-header">
         <div className="print-header-title">وزارة العدل</div>
-        <div className="print-header-subtitle">بطاقة معلومات التقادم الجزائي</div>
+        <div className="print-header-subtitle">بطاقة معلومات التقادم</div>
       </header>
 
       <section className="print-section">
@@ -104,12 +162,18 @@ export default function طباعة_القضية() {
             </tr>
             <tr>
               <th>4) الجهة القضائية</th>
-              <td>{caseData.judicialAuthority || '—'}</td>
+              <td>{getJudicialAuthorityLabel(caseData.judicialAuthority) || '—'}</td>
             </tr>
             <tr>
               <th>5) الصفة القضائية</th>
-              <td>{caseData.judicialOfficer || '—'}</td>
+              <td>{getJudicialOfficerLabel(caseData.judicialOfficer) || '—'}</td>
             </tr>
+            {caseData.indictmentBranch && (
+              <tr>
+                <th>تفريع رئيس غرفة الاتهام</th>
+                <td>{getIndictmentBranchLabel(caseData.indictmentBranch)}</td>
+              </tr>
+            )}
             <tr>
               <th>6) {caseData.trackType === 'PENALTY_EXECUTION' ? 'تاريخ الحكم النهائي (بدء الأجل)' : 'تاريخ اقتراف الجريمة'}</th>
               <td>{formatArabicDate(caseData.crimeDate)}</td>
@@ -181,6 +245,30 @@ export default function طباعة_القضية() {
       </section>
 
       <section className="print-footer">
+        <div className="print-verification">
+          <div>
+            <h3 className="print-section-title">التحقق السريع (QR)</h3>
+            <p className="muted">
+              امسح الرمز للوصول السريع لمسار التحقق المرتبط بالقضية داخل المنصة.
+            </p>
+            <p
+              className="muted"
+              style={{ direction: 'ltr' }}
+              aria-label="رابط التحقق من بطاقة معلومات التقادم"
+            >
+              {verificationRoute}
+            </p>
+          </div>
+          {qrCodeDataUrl ? (
+            <img
+              src={qrCodeDataUrl}
+              alt="رمز QR للتحقق من بطاقة معلومات التقادم"
+              className="print-qr-code"
+            />
+          ) : (
+            <div className="print-qr-fallback muted">تعذر توليد رمز QR</div>
+          )}
+        </div>
         <p className="muted">
           تم استخراج هذه النسخة بعد آخر تحديث إجرائي لضمان تطابق السجل الرقمي مع الملف الورقي.
         </p>
