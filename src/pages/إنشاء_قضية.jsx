@@ -36,16 +36,15 @@ export default function إنشاء_قضية() {
   return (
     <div>
       <div className="page-header">
-        <h2 className="page-title">إنشاء قضية جديدة</h2>
+        <h2 className="page-title">تسجيل قضية جديدة</h2>
       </div>
 
       <div className="card">
         <div className="card-header">
           <div>
-            <div className="card-title">بيانات القضية</div>
+            <div className="card-title">تسجيل معلومات الملف الجزائي</div>
             <div className="card-subtitle">
-              تعبئة الحقول المعتمدة لإنشاء قضية جديدة مع احتساب أجل التقادم
-              تلقائياً.
+              تعبئة الحقول المعتمدة لتسجيل قضية جديدة مع احتساب أجل التقادم تلقائياً.
             </div>
           </div>
         </div>

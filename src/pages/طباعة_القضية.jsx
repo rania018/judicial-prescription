@@ -82,7 +82,7 @@ export default function طباعة_القضية() {
     <div className="print-layout">
       <header className="print-header">
         <div className="print-header-title">وزارة العدل</div>
-        <div className="print-header-subtitle">بطاقة معلومات قضية جزائية - نسخة محدثة</div>
+        <div className="print-header-subtitle">بطاقة معلومات التقادم الجزائي</div>
       </header>
 
       <section className="print-section">
@@ -90,27 +90,27 @@ export default function طباعة_القضية() {
         <table className="print-table">
           <tbody>
             <tr>
-              <th>1) الرقم</th>
+              <th>1) الرقم المرجعي</th>
               <td>{caseData.caseReference}</td>
             </tr>
             <tr>
-              <th>2) المسار</th>
+              <th>2) المسار الإجرائي</th>
               <td>{getTrackTypeLabel(caseData.trackType)}</td>
             </tr>
             <tr>
-              <th>3) التكييف</th>
+              <th>3) تصنيف وتكييف الجريمة</th>
               <td>{getCrimeTypeLabel(caseData.crimeType)}</td>
             </tr>
             <tr>
-              <th>4) الجهة</th>
+              <th>4) الجهة القضائية</th>
               <td>{caseData.judicialAuthority || '—'}</td>
             </tr>
             <tr>
-              <th>5) الصفة</th>
+              <th>5) الصفة القضائية</th>
               <td>{caseData.judicialOfficer || '—'}</td>
             </tr>
             <tr>
-              <th>6) تاريخ الاقتراف</th>
+              <th>6) تاريخ اقتراف الجريمة / بدء السريان</th>
               <td>{formatArabicDate(caseData.crimeDate)}</td>
             </tr>
             <tr>
@@ -118,15 +118,15 @@ export default function طباعة_القضية() {
               <td>{getStatusLabel(caseData.status)}</td>
             </tr>
             <tr>
-              <th>8) تاريخ البدء</th>
+              <th>8) تاريخ بدء الأجل</th>
               <td>{formatArabicDate(caseData.prescriptionStartDate)}</td>
             </tr>
             <tr>
-              <th>9) تاريخ السقوط</th>
+              <th>9) تاريخ السقوط / انتهاء الأجل</th>
               <td>
                 {caseData.prescriptionEndDate
                   ? formatArabicDate(caseData.prescriptionEndDate)
-                  : 'غير قابل للتقادم'}
+                  : 'لا تسقط بالتقادم'}
               </td>
             </tr>
           </tbody>
