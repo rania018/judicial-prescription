@@ -7,7 +7,7 @@ import {
   addCaseSuspension,
   resumeCaseFromSuspension,
 } from '../services/caseService'
-import { formatArabicDate, getDaysRemaining } from '../utils/prescription'
+import { formatArabicDate, getDaysRemaining, yearsBetween } from '../utils/prescription'
 import {
   getCrimeTypeLabel,
   getStatusDescription,
@@ -209,19 +209,17 @@ export default function تفاصيل_القضية() {
               <span>{formatArabicDate(caseData.prescriptionStartDate)}</span>
             </div>
             {caseData.appearanceDate && caseData.severityLevel === 'HIDDEN' && (() => {
-              const crimeD = caseData.crimeDate && (typeof caseData.crimeDate.toDate === 'function' ? caseData.crimeDate.toDate() : new Date(caseData.crimeDate))
-              const appearD = typeof caseData.appearanceDate.toDate === 'function' ? caseData.appearanceDate.toDate() : new Date(caseData.appearanceDate)
-              const elapsedYears = crimeD && appearD ? Math.floor((appearD - crimeD) / (365.25 * 24 * 3600 * 1000)) : null
-              if (elapsedYears === null) return null
-              const totalHiddenDuration = caseData.prescriptionEndDate && crimeD
-                ? Math.round((new Date(typeof caseData.prescriptionEndDate.toDate === 'function' ? caseData.prescriptionEndDate.toDate() : caseData.prescriptionEndDate) - crimeD) / (365.25 * 24 * 3600 * 1000))
+              const elapsedYears = yearsBetween(caseData.crimeDate, caseData.appearanceDate)
+              const totalHiddenDuration = yearsBetween(caseData.crimeDate, caseData.prescriptionEndDate)
+              const remaining = totalHiddenDuration !== null && elapsedYears !== null
+                ? totalHiddenDuration - elapsedYears
                 : null
-              const remaining = totalHiddenDuration !== null ? totalHiddenDuration - elapsedYears : null
+              if (elapsedYears === null) return null
               return (
                 <div className="detail-row" style={{ background: 'var(--color-surface-2, #f0f4ff)', borderRadius: '6px', padding: '0.5rem 0.75rem' }}>
                   <strong>حساب الجريمة الخفية:</strong>
                   <span className="muted" style={{ fontSize: '0.875rem' }}>
-                    {totalHiddenDuration !== null
+                    {totalHiddenDuration !== null && remaining !== null
                       ? `المدة الكلية ${totalHiddenDuration} سنة − المدة الفاصلة (اقتراف→ظهور) ${elapsedYears} سنة = المتبقي ${remaining} سنة من تاريخ الظهور`
                       : `المدة الفاصلة بين الاقتراف والظهور: ${elapsedYears} سنة`}
                   </span>

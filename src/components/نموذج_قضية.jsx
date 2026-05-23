@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import dayjs from 'dayjs'
 import { NON_PRESCRIPTIBLE_CATEGORIES } from '../utils/statusHelpers'
+import { yearsBetween } from '../utils/prescription'
 
 const CRIME_TYPES = [
   { value: 'FELONY', label: 'جناية' },
@@ -103,20 +104,27 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
 
   const isNonPrescriptibleCategoryRequired = crimeType === 'EXEMPTED'
 
+  const isCustomPenaltyValid =
+    severityLevel !== 'CUSTOM' ||
+    (customPenaltyDuration && customPenaltyDuration >= 1 && customPenaltyDuration <= 30)
+  const isMinorValid = !isMinorApplicable || !isMinor || (minorBirthDate && minorBirthDate <= crimeDate)
+  const isAppearanceDateValid =
+    !isAppearanceDateRequired || (appearanceDate && appearanceDate >= crimeDate && appearanceDate <= today)
+  const isSentenceYearsValid = !showSentenceYears || (sentenceYears && sentenceYears >= 5 && sentenceYears <= 20)
+
   const isValid =
     caseReference.trim().length > 0 &&
     trackType &&
     crimeType &&
-    (!isSeverityLevelRequired || (severityLevel &&
-      (severityLevel !== 'CUSTOM' || (customPenaltyDuration && customPenaltyDuration >= 1 && customPenaltyDuration <= 30)))) &&
+    (!isSeverityLevelRequired || (severityLevel && isCustomPenaltyValid)) &&
     (!isNonPrescriptibleCategoryRequired || nonPrescriptibleCategory) &&
     judicialAuthority &&
     judicialOfficer &&
     crimeDate !== '' &&
     crimeDate <= today &&
-    (!isMinorApplicable || !isMinor || (isMinor && minorBirthDate && minorBirthDate <= crimeDate)) &&
-    (!isAppearanceDateRequired || (appearanceDate && appearanceDate >= crimeDate && appearanceDate <= today)) &&
-    (!showSentenceYears || (sentenceYears && sentenceYears >= 5 && sentenceYears <= 20))
+    isMinorValid &&
+    isAppearanceDateValid &&
+    isSentenceYearsValid
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -293,7 +301,7 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
                   if (!e.target.checked) setMinorBirthDate('')
                 }}
               />
-              <span>القضية تتعلق بحدث (قاصر) — يُجمَّد الحساب حتى بلوغه سن الرشد (19 سنة)</span>
+              <span>القضية تتعلق بحدث (قاصر) — يُجمَّد الحساب حتى بلوغه سن الرشد (18 سنة)</span>
             </label>
           </div>
         )}
@@ -406,12 +414,15 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
             />
             <p className="muted">
               التاريخ الذي كُشف فيه عن الجريمة للعموم. يجب أن يكون بعد تاريخ الاقتراف وليس مستقبلياً.
-              {crimeDate && appearanceDate && appearanceDate >= crimeDate && (
-                <span style={{ display: 'block', marginTop: '0.25rem', fontWeight: 600 }}>
-                  المدة الفاصلة بين الاقتراف والظهور:{' '}
-                  {Math.floor((new Date(appearanceDate) - new Date(crimeDate)) / (365.25 * 24 * 3600 * 1000))} سنة.
-                </span>
-              )}
+              {(() => {
+                const elapsed = yearsBetween(crimeDate ? new Date(crimeDate) : null, appearanceDate ? new Date(appearanceDate) : null)
+                if (elapsed === null || elapsed < 0) return null
+                return (
+                  <span style={{ display: 'block', marginTop: '0.25rem', fontWeight: 600 }}>
+                    المدة الفاصلة بين الاقتراف والظهور: {elapsed} سنة.
+                  </span>
+                )
+              })()}
             </p>
           </div>
         )}

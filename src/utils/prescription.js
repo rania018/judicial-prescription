@@ -248,6 +248,21 @@ export function formatArabicDate(timestampOrDate) {
   return dayjs(date).format('DD/MM/YYYY')
 }
 
+/** Approximate milliseconds in one Julian year. */
+export const MS_PER_YEAR = 365.25 * 24 * 3600 * 1000
+
+/**
+ * Compute the number of elapsed whole years between two dates.
+ * Accepts Date objects, Firestore Timestamps, or anything accepted by `new Date()`.
+ * Returns null when either argument is absent or invalid.
+ */
+export function yearsBetween(from, to) {
+  const fromD = from && (typeof from.toDate === 'function' ? from.toDate() : new Date(from))
+  const toD = to && (typeof to.toDate === 'function' ? to.toDate() : new Date(to))
+  if (!fromD || !toD || Number.isNaN(fromD.getTime()) || Number.isNaN(toD.getTime())) return null
+  return Math.floor((toD - fromD) / MS_PER_YEAR)
+}
+
 // Africa/Algiers = UTC+1 — الجزائر؛ نفس منطق Cloud Function لاحتساب «اليوم»
 const ALGIERS_OFFSET_MS = 1 * 60 * 60 * 1000
 
