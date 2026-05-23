@@ -99,6 +99,7 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
   const isAppearanceDateRequired = severityLevel === 'HIDDEN' && isHiddenApplicable
   const requiresIndictmentBranch =
     judicialAuthority === 'COUNCIL' && judicialOfficer === 'INDICTMENT_CHAMBER_PRESIDENT'
+  const hasIndictmentBranchConfig = INDICTMENT_BRANCH_GROUPS.length > 0
   const currentIndictmentOptions = INDICTMENT_BRANCH_OPTIONS[indictmentBranchGroup] || []
 
   useEffect(() => {
@@ -107,11 +108,20 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
       setIndictmentBranch('')
       return
     }
+    if (!hasIndictmentBranchConfig) {
+      setIndictmentBranchGroup('')
+      setIndictmentBranch('')
+      return
+    }
     setIndictmentBranchGroup((prev) => prev || INDICTMENT_BRANCH_GROUPS[0]?.value || '')
-  }, [requiresIndictmentBranch])
+  }, [requiresIndictmentBranch, hasIndictmentBranchConfig])
 
   useEffect(() => {
     if (!requiresIndictmentBranch) return
+    if (!hasIndictmentBranchConfig) {
+      setIndictmentBranch('')
+      return
+    }
     const options = INDICTMENT_BRANCH_OPTIONS[indictmentBranchGroup] || []
     if (options.length === 0) {
       setIndictmentBranch('')
@@ -120,7 +130,7 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
     setIndictmentBranch((prev) =>
       options.some((option) => option.value === prev) ? prev : options[0]?.value || '',
     )
-  }, [requiresIndictmentBranch, indictmentBranchGroup])
+  }, [requiresIndictmentBranch, indictmentBranchGroup, hasIndictmentBranchConfig])
 
   // Severity level options by track and crime type
   const showSeveritySection = trackType === 'PROSECUTION' && crimeType !== 'VIOLATION' && crimeType !== 'EXEMPTED'
@@ -155,7 +165,7 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
     isMinorValid &&
     isAppearanceDateValid &&
     isSentenceYearsValid &&
-    (!requiresIndictmentBranch || Boolean(indictmentBranch))
+    (!requiresIndictmentBranch || (hasIndictmentBranchConfig && Boolean(indictmentBranch)))
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -498,7 +508,13 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
           </select>
         </div>
 
-        {requiresIndictmentBranch && (
+        {requiresIndictmentBranch && !hasIndictmentBranchConfig && (
+          <div className="form-field">
+            <p className="muted">تعذر تحميل تفريعات رئيس غرفة الاتهام حالياً. يرجى مراجعة إعدادات النظام.</p>
+          </div>
+        )}
+
+        {requiresIndictmentBranch && hasIndictmentBranchConfig && (
           <>
             <div className="form-field">
               <label className="form-label" htmlFor="indictmentBranchGroup">

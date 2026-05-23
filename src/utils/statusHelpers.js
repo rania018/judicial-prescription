@@ -83,6 +83,7 @@ export const INDICTMENT_BRANCH_OPTIONS = {
 export const INDICTMENT_BRANCH_LABELS = Object.fromEntries(
   Object.values(INDICTMENT_BRANCH_OPTIONS)
     .flat()
+    .filter((option) => option?.value && option?.label)
     .map(({ value, label }) => [value, label]),
 )
 

@@ -37,7 +37,11 @@ function getPrintActionDetails(action) {
 function serializeDateForVerification(value) {
   if (!value) return null
   const date = typeof value.toDate === 'function' ? value.toDate() : new Date(value)
-  if (Number.isNaN(date.getTime())) return null
+  if (Number.isNaN(date.getTime())) {
+    // eslint-disable-next-line no-console
+    console.warn('Invalid date in QR verification payload:', value)
+    return null
+  }
   return date.toISOString().slice(0, 10)
 }
 
@@ -247,7 +251,11 @@ export default function طباعة_القضية() {
             <p className="muted">
               امسح الرمز للوصول السريع لمسار التحقق المرتبط بالقضية داخل المنصة.
             </p>
-            <p className="muted" style={{ direction: 'ltr' }}>
+            <p
+              className="muted"
+              style={{ direction: 'ltr' }}
+              aria-label="رابط التحقق من بطاقة معلومات التقادم"
+            >
               {verificationRoute}
             </p>
           </div>
