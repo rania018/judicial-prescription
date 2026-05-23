@@ -112,6 +112,8 @@ export async function createCase(baseData, userId, userProfile = {}) {
     nonPrescriptibleCategory: baseData.nonPrescriptibleCategory || null,
     judicialAuthority: baseData.judicialAuthority,
     judicialOfficer: baseData.judicialOfficer,
+    indictmentBranchGroup: baseData.indictmentBranchGroup || null,
+    indictmentBranch: baseData.indictmentBranch || null,
     crimeDate: baseData.crimeDate,
     isMinor: baseData.isMinor || false,
     minorBirthDate: baseData.minorBirthDate || null,

@@ -14,6 +14,22 @@ export const TRACK_TYPE_LABELS = {
   PENALTY_EXECUTION: 'مرحلة تنفيذ العقوبة',
 }
 
+export const JUDICIAL_AUTHORITY_LABELS = {
+  COURT: 'محكمة',
+  COUNCIL: 'مجلس قضائي',
+}
+
+export const JUDICIAL_OFFICER_LABELS = {
+  PROSECUTOR: 'وكيل الجمهورية',
+  COURT_PRESIDENT: 'رئيس المحكمة',
+  INVESTIGATING_JUDGE: 'قاضي التحقيق',
+  JUVENILE_JUDGE: 'قاضي الأحداث',
+  SENTENCING_JUDGE: 'قاضي الحكم',
+  ATTORNEY_GENERAL: 'النائب العام',
+  COUNCIL_PRESIDENT: 'رئيس المجلس',
+  INDICTMENT_CHAMBER_PRESIDENT: 'رئيس غرفة الاتهام',
+}
+
 export const CASE_STAGE_LABELS = {
   PROSECUTION: 'مرحلة المتابعة الجزائية',
   SENTENCE: 'مرحلة الحكم',
@@ -42,6 +58,32 @@ export const NON_PRESCRIPTIBLE_CATEGORIES = [
 
 export const NON_PRESCRIPTIBLE_CATEGORY_LABELS = Object.fromEntries(
   NON_PRESCRIPTIBLE_CATEGORIES.map(({ value, label }) => [value, label]),
+)
+
+export const INDICTMENT_BRANCH_GROUPS = [
+  { value: 'MISDEMEANOR_CASES', label: 'نافذة القضايا الجنحية' },
+  { value: 'CRIMINAL_CASES', label: 'نافذة القضايا الجنائية' },
+  { value: 'CRIMINAL_COURT', label: 'نافذة محكمة الجنايات' },
+]
+
+export const INDICTMENT_BRANCH_OPTIONS = {
+  MISDEMEANOR_CASES: [
+    { value: 'MISDEMEANOR_ADULT', label: 'قضايا جنحية للبالغين' },
+    { value: 'MISDEMEANOR_JUVENILE', label: 'قضايا جنحية للأحداث' },
+  ],
+  CRIMINAL_CASES: [
+    { value: 'CRIMINAL_JUVENILE_COUNCIL_SEAT', label: 'قضايا جنائية للأحداث (محكمة مقر المجلس)' },
+  ],
+  CRIMINAL_COURT: [
+    { value: 'CRIMINAL_COURT_FIRST_INSTANCE', label: 'محكمة الجنايات الابتدائية' },
+    { value: 'CRIMINAL_COURT_APPEAL', label: 'محكمة الجنايات الاستئنافية' },
+  ],
+}
+
+export const INDICTMENT_BRANCH_LABELS = Object.fromEntries(
+  Object.values(INDICTMENT_BRANCH_OPTIONS)
+    .flat()
+    .map(({ value, label }) => [value, label]),
 )
 
 export const INTERRUPTION_TYPE_LABELS = {
@@ -198,6 +240,14 @@ export function getTrackTypeLabel(value) {
   return TRACK_TYPE_LABELS[value] ?? value
 }
 
+export function getJudicialOfficerLabel(value) {
+  return JUDICIAL_OFFICER_LABELS[value] ?? value
+}
+
+export function getJudicialAuthorityLabel(value) {
+  return JUDICIAL_AUTHORITY_LABELS[value] ?? value
+}
+
 export function getCaseStageLabel(value) {
   return (value && CASE_STAGE_LABELS[value]) || value || '—'
 }
@@ -212,6 +262,10 @@ export function getSeverityLevelLabel(value) {
 
 export function getNonPrescriptibleCategoryLabel(value) {
   return NON_PRESCRIPTIBLE_CATEGORY_LABELS[value] ?? value
+}
+
+export function getIndictmentBranchLabel(value) {
+  return INDICTMENT_BRANCH_LABELS[value] ?? value
 }
 
 export function getInterruptionTypeLabel(value) {

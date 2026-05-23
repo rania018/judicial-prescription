@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react'
 import dayjs from 'dayjs'
-import { NON_PRESCRIPTIBLE_CATEGORIES } from '../utils/statusHelpers'
+import {
+  INDICTMENT_BRANCH_GROUPS,
+  INDICTMENT_BRANCH_OPTIONS,
+  NON_PRESCRIPTIBLE_CATEGORIES,
+} from '../utils/statusHelpers'
 import { yearsBetween } from '../utils/prescription'
 
 const CRIME_TYPES = [
@@ -49,6 +53,8 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
   const [nonPrescriptibleCategory, setNonPrescriptibleCategory] = useState('')
   const [judicialAuthority, setJudicialAuthority] = useState('COURT')
   const [judicialOfficer, setJudicialOfficer] = useState('PROSECUTOR')
+  const [indictmentBranchGroup, setIndictmentBranchGroup] = useState('')
+  const [indictmentBranch, setIndictmentBranch] = useState('')
   const [crimeDate, setCrimeDate] = useState('')
 
   // Update officer positions when judicial authority changes
@@ -91,6 +97,33 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
   const isMinorApplicable = trackType === 'PROSECUTION'
   const isHiddenApplicable = trackType === 'PROSECUTION' && crimeType !== 'VIOLATION' && crimeType !== 'EXEMPTED'
   const isAppearanceDateRequired = severityLevel === 'HIDDEN' && isHiddenApplicable
+  const requiresIndictmentBranch =
+    judicialAuthority === 'COUNCIL' && judicialOfficer === 'INDICTMENT_CHAMBER_PRESIDENT'
+  const currentIndictmentOptions = INDICTMENT_BRANCH_OPTIONS[indictmentBranchGroup] || []
+
+  useEffect(() => {
+    if (!requiresIndictmentBranch) {
+      setIndictmentBranchGroup('')
+      setIndictmentBranch('')
+      return
+    }
+
+    if (!indictmentBranchGroup) {
+      setIndictmentBranchGroup(INDICTMENT_BRANCH_GROUPS[0].value)
+    }
+  }, [requiresIndictmentBranch, indictmentBranchGroup])
+
+  useEffect(() => {
+    if (!requiresIndictmentBranch) return
+    const options = INDICTMENT_BRANCH_OPTIONS[indictmentBranchGroup] || []
+    if (options.length === 0) {
+      setIndictmentBranch('')
+      return
+    }
+    if (!options.some((option) => option.value === indictmentBranch)) {
+      setIndictmentBranch(options[0].value)
+    }
+  }, [requiresIndictmentBranch, indictmentBranchGroup, indictmentBranch])
 
   // Severity level options by track and crime type
   const showSeveritySection = trackType === 'PROSECUTION' && crimeType !== 'VIOLATION' && crimeType !== 'EXEMPTED'
@@ -124,7 +157,8 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
     crimeDate <= today &&
     isMinorValid &&
     isAppearanceDateValid &&
-    isSentenceYearsValid
+    isSentenceYearsValid &&
+    (!requiresIndictmentBranch || Boolean(indictmentBranch))
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -147,6 +181,8 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
       ...(nonPrescriptibleCategory && { nonPrescriptibleCategory }),
       judicialAuthority,
       judicialOfficer,
+      ...(requiresIndictmentBranch && indictmentBranchGroup && { indictmentBranchGroup }),
+      ...(requiresIndictmentBranch && indictmentBranch && { indictmentBranch }),
       crimeDate: crimeDateObj,
     })
   }
@@ -464,6 +500,49 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
             ))}
           </select>
         </div>
+
+        {requiresIndictmentBranch && (
+          <>
+            <div className="form-field">
+              <label className="form-label" htmlFor="indictmentBranchGroup">
+                تفريع رئيس غرفة الاتهام
+              </label>
+              <select
+                id="indictmentBranchGroup"
+                className="form-select"
+                value={indictmentBranchGroup}
+                onChange={(e) => setIndictmentBranchGroup(e.target.value)}
+                required
+              >
+                {INDICTMENT_BRANCH_GROUPS.map((group) => (
+                  <option key={group.value} value={group.value}>
+                    {group.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-field">
+              <label className="form-label" htmlFor="indictmentBranch">
+                نوع الملف داخل التفريع
+              </label>
+              <select
+                id="indictmentBranch"
+                className="form-select"
+                value={indictmentBranch}
+                onChange={(e) => setIndictmentBranch(e.target.value)}
+                required
+              >
+                {currentIndictmentOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <p className="muted">اختيار ديناميكي مبسط يعكس نوافذ رئيس غرفة الاتهام المطلوبة.</p>
+            </div>
+          </>
+        )}
 
         <div className="form-field">
           <label className="form-label" htmlFor="crimeDate">
