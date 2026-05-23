@@ -34,7 +34,7 @@ function getPrintActionDetails(action) {
   return action.notes || 'استئناف سريان الأجل'
 }
 
-function serializeDateForVerification(value) {
+function formatDateForQR(value) {
   if (!value) return null
   const date = typeof value.toDate === 'function' ? value.toDate() : new Date(value)
   if (Number.isNaN(date.getTime())) {
@@ -98,7 +98,7 @@ export default function طباعة_القضية() {
         i: caseData.id || caseId,
         t: caseData.trackType,
         s: caseData.status,
-        e: serializeDateForVerification(caseData.prescriptionEndDate),
+        e: formatDateForQR(caseData.prescriptionEndDate),
         v: verificationRoute,
       })
 

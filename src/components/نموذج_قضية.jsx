@@ -103,12 +103,7 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
   const currentIndictmentOptions = INDICTMENT_BRANCH_OPTIONS[indictmentBranchGroup] || []
 
   useEffect(() => {
-    if (!requiresIndictmentBranch) {
-      setIndictmentBranchGroup('')
-      setIndictmentBranch('')
-      return
-    }
-    if (!hasIndictmentBranchConfig) {
+    if (!requiresIndictmentBranch || !hasIndictmentBranchConfig) {
       setIndictmentBranchGroup('')
       setIndictmentBranch('')
       return
