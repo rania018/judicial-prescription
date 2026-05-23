@@ -137,31 +137,31 @@ export default function تفاصيل_القضية() {
       <div className="grid grid-2">
         <div className="card">
           <div className="card-header">
-            <h3 className="card-title">البيانات الأساسية (الحقول المطلوبة)</h3>
+            <h3 className="card-title">البيانات الأساسية</h3>
           </div>
           <div className="card-body">
             <div className="detail-row">
-              <strong>1) الرقم:</strong>
+              <strong>1) الرقم المرجعي:</strong>
               <span>{caseData.caseReference}</span>
             </div>
             <div className="detail-row">
-              <strong>2) المسار:</strong>
+              <strong>2) المسار الإجرائي:</strong>
               <span>{getTrackTypeLabel(caseData.trackType)}</span>
             </div>
             <div className="detail-row">
-              <strong>3) التكييف:</strong>
+              <strong>3) تصنيف وتكييف الجريمة:</strong>
               <span>{getCrimeTypeLabel(caseData.crimeType)}</span>
             </div>
             <div className="detail-row">
-              <strong>4) الجهة:</strong>
+              <strong>4) الجهة القضائية:</strong>
               <span>{caseData.judicialAuthority}</span>
             </div>
             <div className="detail-row">
-              <strong>5) الصفة:</strong>
+              <strong>5) الصفة القضائية:</strong>
               <span>{caseData.judicialOfficer}</span>
             </div>
             <div className="detail-row">
-              <strong>6) تاريخ الاقتراف:</strong>
+              <strong>6) تاريخ اقتراف الجريمة / بدء السريان:</strong>
               <span>{formatArabicDate(caseData.crimeDate)}</span>
             </div>
             {caseData.severityLevel && (
@@ -179,22 +179,22 @@ export default function تفاصيل_القضية() {
           </div>
           <div className="card-body">
             <div className="detail-row">
-              <strong>7) حالة التقادم بالألوان:</strong>
+              <strong>7) حالة التقادم:</strong>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                 <شارة_الحالة status={caseData.status} />
                 <span className="muted">{getStatusDescription(caseData.status)}</span>
               </div>
             </div>
             <div className="detail-row">
-              <strong>8) تاريخ البدء:</strong>
+              <strong>8) تاريخ بدء الأجل:</strong>
               <span>{formatArabicDate(caseData.prescriptionStartDate)}</span>
             </div>
             <div className="detail-row">
-              <strong>9) تاريخ السقوط:</strong>
+              <strong>9) تاريخ السقوط / انتهاء الأجل:</strong>
               <span>
                 {caseData.prescriptionEndDate
                   ? formatArabicDate(caseData.prescriptionEndDate)
-                  : 'غير قابل للتقادم'}
+                  : 'لا تسقط بالتقادم'}
               </span>
             </div>
             {caseData.prescriptionEndDate && (

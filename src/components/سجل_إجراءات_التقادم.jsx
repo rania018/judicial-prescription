@@ -136,7 +136,7 @@ export default function سجل_إجراءات_التقادم({
             )}
 
             <Link to={`/القضايا/${caseId}/طباعة`} className="btn btn-secondary">
-              طباعة
+              🖨️ طباعة بطاقة معلومات التقادم
             </Link>
           </div>
 

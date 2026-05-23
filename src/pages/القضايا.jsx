@@ -11,12 +11,12 @@ import { useToast } from '../context/ToastContext.jsx'
 
 const STATUS_FILTERS = [
   { value: 'ALL', label: 'كل الحالات' },
-  { value: 'CRITICAL', label: 'حرجة خلال أقل من 6 أشهر' },
-  { value: 'WARNING', label: 'متابعة خلال سنة' },
-  { value: 'ACTIVE', label: 'آمنة' },
+  { value: 'CRITICAL', label: 'خطرة (أقل من 6 أشهر)' },
+  { value: 'WARNING', label: 'عاجلة (أقل من سنة)' },
+  { value: 'ACTIVE', label: 'سارية / آمنة' },
   { value: 'SUSPENDED', label: 'موقوفة' },
   { value: 'EXPIRED', label: 'منتهية' },
-  { value: 'NON_PRESCRIPTIBLE', label: 'غير خاضعة للتقادم' },
+  { value: 'NON_PRESCRIPTIBLE', label: 'لا تسقط بالتقادم' },
 ]
 
 const CRIME_TYPE_FILTERS = [
@@ -25,7 +25,7 @@ const CRIME_TYPE_FILTERS = [
   { value: 'SIMPLE_MISDEMEANOR', label: 'جنحة بسيطة' },
   { value: 'AGGRAVATED_MISDEMEANOR', label: 'جنحة مشددة' },
   { value: 'VIOLATION', label: 'مخالفة' },
-  { value: 'EXEMPTED', label: 'مستثنى من السقوط' },
+  { value: 'EXEMPTED', label: 'جرائم لا تسقط بالتقادم' },
 ]
 
 export default function القضايا() {
@@ -114,15 +114,15 @@ export default function القضايا() {
   return (
     <div>
       <div className="page-header">
-        <h2 className="page-title">القضايا</h2>
+        <h2 className="page-title">سجل القضايا</h2>
       </div>
 
       <div className="card">
         <div className="card-header">
           <div>
-            <div className="card-title">سجل القضايا</div>
+            <div className="card-title">سجل القضايا الجزائية</div>
             <div className="card-subtitle">
-              استعراض القضايا المتاحة لك مع إمكانية التصفية حسب الحالة والبحث برقم القضية.
+              استعراض القضايا المتاحة لك مع إمكانية البحث بالرقم المرجعي / رقم القضية والتصفية حسب الحالة.
             </div>
           </div>
           <div className="page-actions">
@@ -176,12 +176,13 @@ export default function القضايا() {
 
           <div className="form-field">
             <label className="form-label" htmlFor="caseReferenceFilter">
-              رقم القضية
+              الرقم المرجعي / رقم القضية
             </label>
             <input
               id="caseReferenceFilter"
               type="text"
               className="form-input"
+              placeholder="ابحث بالرقم المرجعي أو رقم القضية"
               value={caseReferenceFilter}
               onChange={(e) => setCaseReferenceFilter(e.target.value)}
             />

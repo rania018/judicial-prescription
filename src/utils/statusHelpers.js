@@ -6,7 +6,7 @@ export const CRIME_TYPE_LABELS = {
   SIMPLE_MISDEMEANOR: 'جنحة بسيطة',
   AGGRAVATED_MISDEMEANOR: 'جنحة مشددة',
   VIOLATION: 'مخالفة',
-  EXEMPTED: 'مستثنى من السقوط',
+  EXEMPTED: 'جرائم لا تسقط بالتقادم',
 }
 
 export const TRACK_TYPE_LABELS = {
@@ -27,9 +27,9 @@ export const ACTION_TYPE_LABELS = {
 }
 
 export const SEVERITY_LEVEL_LABELS = {
-  HIDDEN: 'مخفية',
-  EQUAL_TO_SENTENCE: 'مساوية لمدة العقوبة',
-  CUSTOM: 'مدة تخصيص العقوبة',
+  HIDDEN: 'جريمة خفية / مخفية',
+  EQUAL_TO_SENTENCE: 'مدة التقادم مساوية لمدة العقوبة',
+  CUSTOM: 'مدة تقادم خاصة (مخصصة)',
 }
 
 export const INTERRUPTION_TYPE_LABELS = {
@@ -41,21 +41,21 @@ export const INTERRUPTION_TYPE_LABELS = {
 
 export const STATUS_META = {
   ACTIVE: {
-    label: 'آمنة',
+    label: 'سارية / آمنة',
     description: 'أكثر من سنة متبقية على انتهاء الأجل',
     badgeClass: 'status-badge status-badge-active',
     cardClass: 'status-card status-card-active',
     tone: 'safe',
   },
   WARNING: {
-    label: 'متابعة خلال سنة',
+    label: 'عاجلة',
     description: 'بين 6 أشهر و12 شهراً متبقية على انتهاء الأجل',
     badgeClass: 'status-badge status-badge-warning',
     cardClass: 'status-card status-card-warning',
     tone: 'warning',
   },
   CRITICAL: {
-    label: 'حرجة خلال أقل من 6 أشهر',
+    label: 'خطرة',
     description: 'أقل من 6 أشهر متبقية على انتهاء الأجل',
     badgeClass: 'status-badge status-badge-critical',
     cardClass: 'status-card status-card-critical',
@@ -76,8 +76,8 @@ export const STATUS_META = {
     tone: 'neutral',
   },
   NON_PRESCRIPTIBLE: {
-    label: 'غير خاضعة للتقادم',
-    description: 'هذا الملف لا يخضع لآجال التقادم',
+    label: 'لا تسقط بالتقادم',
+    description: 'هذا الملف لا يخضع لآجال التقادم (جرائم لا تسقط بالتقادم)',
     badgeClass: 'status-badge status-badge-non-prescriptible',
     cardClass: 'status-card status-card-non-prescriptible',
     tone: 'info',
