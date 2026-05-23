@@ -41,6 +41,11 @@ function serializeDateForVerification(value) {
   return date.toISOString().slice(0, 10)
 }
 
+function buildVerificationRoute(caseId, fallbackId) {
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  return `${origin}/القضايا/${caseId || fallbackId}`
+}
+
 export default function طباعة_القضية() {
   const { caseId } = useParams()
   const { user, role, userProfile } = useAuth()
@@ -82,9 +87,7 @@ export default function طباعة_القضية() {
         return
       }
 
-      const verificationRoute = typeof window !== 'undefined'
-        ? `${window.location.origin}/القضايا/${caseData.id || caseId}`
-        : `/القضايا/${caseData.id || caseId}`
+      const verificationRoute = buildVerificationRoute(caseData.id, caseId)
 
       const verificationPayload = JSON.stringify({
         r: caseData.caseReference,
@@ -127,6 +130,8 @@ export default function طباعة_القضية() {
       </div>
     )
   }
+
+  const verificationRoute = buildVerificationRoute(caseData.id, caseId)
 
   return (
     <div className="print-layout">
@@ -243,7 +248,7 @@ export default function طباعة_القضية() {
               امسح الرمز للوصول السريع لمسار التحقق المرتبط بالقضية داخل المنصة.
             </p>
             <p className="muted" style={{ direction: 'ltr' }}>
-              {(typeof window !== 'undefined' ? window.location.origin : '')}/القضايا/{caseData.id || caseId}
+              {verificationRoute}
             </p>
           </div>
           {qrCodeDataUrl ? (
