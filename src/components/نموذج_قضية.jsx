@@ -108,6 +108,12 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
       return
     }
 
+    if (INDICTMENT_BRANCH_GROUPS.length === 0) {
+      setIndictmentBranchGroup('')
+      setIndictmentBranch('')
+      return
+    }
+
     if (!indictmentBranchGroup) {
       setIndictmentBranchGroup(INDICTMENT_BRANCH_GROUPS[0].value)
     }

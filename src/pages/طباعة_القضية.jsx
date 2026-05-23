@@ -102,7 +102,9 @@ export default function طباعة_القضية() {
           errorCorrectionLevel: 'M',
         })
         setQrCodeDataUrl(dataUrl)
-      } catch {
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('QR generation failed:', error)
         setQrCodeDataUrl('')
       }
     }
