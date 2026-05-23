@@ -59,11 +59,10 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
     if (trackType === 'PENALTY_EXECUTION') {
       setIsMinor(false)
       setMinorBirthDate('')
-      if (severityLevel === 'HIDDEN' || severityLevel === 'EQUAL_TO_SENTENCE') {
-        setSeverityLevel('')
-      }
+      setSeverityLevel((prev) =>
+        prev === 'HIDDEN' || prev === 'EQUAL_TO_SENTENCE' ? '' : prev,
+      )
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trackType])
 
   const today = dayjs().format('YYYY-MM-DD')
@@ -180,7 +179,7 @@ export default function نموذج_قضية({ onSubmit, submitting }) {
         {trackType === 'PROSECUTION' && (
           <div className="form-field">
             <label className="form-label" htmlFor="isMinor">
-              قضية الحدث
+              قضية الأحداث
             </label>
             <label className="form-checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
               <input
